@@ -1,8 +1,0 @@
-blank_issues_enabled: false
-contact_links:
-  - name: Security vulnerability
-    url: https://github.com/YOURNAME/sentinelscan/blob/main/SECURITY.md
-    about: Please report security issues privately — see SECURITY.md
-  - name: Question or discussion
-    url: https://github.com/YOURNAME/sentinelscan/discussions
-    about: Ask questions or start a discussion here
