@@ -51,12 +51,32 @@ jobs:
           key: taurie-${{ runner.os }}-${{ hashFiles('src-tauri/Cargo.toml') }}
           restore-keys: taurie-${{ runner.os }}-
 
-      - name: Build & release with Tauri
-        uses: tauri-apps/tauri-action@v0
+      - name: Build with Tauri
+        run: |
+          set -o pipefail
+          npx tauri build --bundles ${{ matrix.bundles }} 2>&1 | tee /tmp/tauri-build.log
+
+      - name: Push build log to diagnostics branch
+        if: failure()
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          cp /tmp/tauri-build.log tauri-build-diagnostics.txt
+          git config user.email "ci@optimakerpro.dev"
+          git config user.name "Taurie CI"
+          git add tauri-build-diagnostics.txt
+          git commit -q -m "ci: capture tauri build diagnostics (${{ matrix.platform }})"
+          git push "https://x-access-token:${GITHUB_TOKEN}@github.com/${{ github.repository }}.git" \
+            HEAD:refs/heads/ci-build-diagnostics
+
+      - name: Publish release assets
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
         with:
-          args: --bundles ${{ matrix.bundles }}
+          files: |
+            src-tauri/target/release/bundle/msi/*.msi
+            src-tauri/target/release/bundle/nsis/*.exe
+            src-tauri/target/release/bundle/dmg/*.dmg
 
       - name: Upload artifacts
         if: always()
