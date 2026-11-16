@@ -57,7 +57,7 @@ fn watch_games(
         return;
     }
 
-    sys.refresh_processes(sysinfo::ProcessesToUpdate::All, true);
+    sys.refresh_processes(sysinfo::ProcessesToUpdate::All);
 
     // Map game executables to running pids.
     let mut seen: HashMap<String, u32> = HashMap::new();

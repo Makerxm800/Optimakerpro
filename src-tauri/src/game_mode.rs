@@ -27,7 +27,7 @@ pub struct GameTweaks {
 }
 
 impl GameTweaks {
-    fn any_affinity(&self) -> bool {
+    pub fn any_affinity(&self) -> bool {
         self.disable_cpu0 || self.disable_ecores || self.disable_smt
     }
 }
@@ -255,61 +255,66 @@ fn smt_free_mask() -> usize {
 }
 
 pub fn core_topology() -> CoreTopology {
-    #[cfg(windows)]
-    {
-        let masks = topology::core_masks();
-        let sys = topology::system_mask();
-        let hybrid = has_perf_class(&masks);
-        CoreTopology {
-            cores: masks.len(),
-            logical: sys.count_ones() as usize,
-            e_cores: if hybrid {
-                masks.iter().filter(|(_, c)| *c == 0).count()
-            } else {
-                0
-            },
-            smt: masks.iter().any(|(m, _)| m.count_ones() > 1),
-        }
+    core_topology_impl()
+}
+
+#[cfg(windows)]
+fn core_topology_impl() -> CoreTopology {
+    let masks = topology::core_masks();
+    let sys = topology::system_mask();
+    let hybrid = has_perf_class(&masks);
+    CoreTopology {
+        cores: masks.len(),
+        logical: sys.count_ones() as usize,
+        e_cores: if hybrid {
+            masks.iter().filter(|(_, c)| *c == 0).count()
+        } else {
+            0
+        },
+        smt: masks.iter().any(|(m, _)| m.count_ones() > 1),
     }
-    #[cfg(not(windows))]
-    {
-        CoreTopology {
-            cores: 0,
-            logical: 0,
-            e_cores: 0,
-            smt: false,
-        }
+}
+
+#[cfg(not(windows))]
+fn core_topology_impl() -> CoreTopology {
+    CoreTopology {
+        cores: 0,
+        logical: 0,
+        e_cores: 0,
+        smt: false,
     }
 }
 
 fn compute_mask(tweaks: &GameTweaks) -> Result<usize, String> {
-    #[cfg(windows)]
-    {
-        let sys = topology::system_mask();
-        if sys == 0 {
-            return Err("Could not read CPU topology".to_string());
-        }
-        let hybrid = has_perf_class(&topology::core_masks());
-        let mut target = sys;
-        if tweaks.disable_ecores && hybrid {
-            target &= p_core_mask();
-        }
-        if tweaks.disable_smt {
-            target &= smt_free_mask();
-        }
-        if tweaks.disable_cpu0 {
-            target &= !1usize;
-        }
-        if target == 0 {
-            return Err("These tweaks cancel each other out — no cores left".to_string());
-        }
-        Ok(target)
+    compute_mask_impl(tweaks)
+}
+
+#[cfg(windows)]
+fn compute_mask_impl(tweaks: &GameTweaks) -> Result<usize, String> {
+    let sys = topology::system_mask();
+    if sys == 0 {
+        return Err("Could not read CPU topology".to_string());
     }
-    #[cfg(not(windows))]
-    {
-        let _ = tweaks;
-        Err("Game tweaks are Windows-only".to_string())
+    let hybrid = has_perf_class(&topology::core_masks());
+    let mut target = sys;
+    if tweaks.disable_ecores && hybrid {
+        target &= p_core_mask();
     }
+    if tweaks.disable_smt {
+        target &= smt_free_mask();
+    }
+    if tweaks.disable_cpu0 {
+        target &= !1usize;
+    }
+    if target == 0 {
+        return Err("These tweaks cancel each other out — no cores left".to_string());
+    }
+    Ok(target)
+}
+
+#[cfg(not(windows))]
+fn compute_mask_impl(_tweaks: &GameTweaks) -> Result<usize, String> {
+    Err("Game tweaks are Windows-only".to_string())
 }
 
 pub fn apply_affinity_pid(pid: u32, tweaks: &GameTweaks) -> Result<(), String> {
@@ -332,7 +337,7 @@ pub fn apply_affinity_pid(pid: u32, tweaks: &GameTweaks) -> Result<(), String> {
 #[cfg(windows)]
 fn running_exe_names() -> HashSet<String> {
     let mut sys = sysinfo::System::new();
-    sys.refresh_processes(sysinfo::ProcessesToUpdate::All, true);
+    sys.refresh_processes(sysinfo::ProcessesToUpdate::All);
     let mut names = HashSet::new();
     for process in sys.processes().values() {
         if let Some(exe) = process.exe() {
@@ -746,6 +751,7 @@ pub fn restore_affinity(_entry: &GameEntry) -> Result<(), String> {
     Err("Game tweaks are Windows-only".to_string())
 }
 
+#[cfg(windows)]
 pub fn apply_affinity_for_entry(entry: &GameEntry, tweaks: &GameTweaks) -> Result<(), String> {
     if !tweaks.any_affinity() {
         return Ok(());
@@ -755,11 +761,16 @@ pub fn apply_affinity_for_entry(entry: &GameEntry, tweaks: &GameTweaks) -> Resul
     topology::set_affinity(pid, mask)
 }
 
+#[cfg(not(windows))]
+pub fn apply_affinity_for_entry(_entry: &GameEntry, _tweaks: &GameTweaks) -> Result<(), String> {
+    Err("Game tweaks are Windows-only".to_string())
+}
+
 pub fn find_pid_by_exe(exe_name: &str) -> Option<u32> {
     let target = exe_name.to_lowercase();
     let stripped = target.trim_end_matches(".exe").to_string();
     let mut sys = sysinfo::System::new();
-    sys.refresh_processes(sysinfo::ProcessesToUpdate::All, true);
+    sys.refresh_processes(sysinfo::ProcessesToUpdate::All);
     for (pid, process) in sys.processes() {
         let name = process.name().to_string_lossy().to_lowercase();
         let exe_match = process
@@ -1531,64 +1542,65 @@ fn tweak_active(_id: &str) -> bool {
 /// reg import (single UAC prompt); non-admin ones are written directly.
 #[tauri::command]
 pub fn set_tweaks(ids: Vec<String>, enabled: bool) -> Result<Vec<TweakState>, String> {
-    #[cfg(windows)]
-    {
-        let defs = catalog();
-        let mut script = RegScript::default();
+    set_tweaks_impl(ids, enabled)
+}
 
-        for id in &ids {
-            let Some(def) = defs.iter().find(|d| d.id == *id) else {
-                continue;
-            };
-            if def.needs_admin {
-                apply_one(id, enabled, &mut script)?;
-            } else {
-                let mut scratch = RegScript::default();
-                apply_one(id, enabled, &mut scratch)?;
-            }
+#[cfg(windows)]
+fn set_tweaks_impl(ids: Vec<String>, enabled: bool) -> Result<Vec<TweakState>, String> {
+    let defs = catalog();
+    let mut script = RegScript::default();
+
+    for id in &ids {
+        let Some(def) = defs.iter().find(|d| d.id == *id) else {
+            continue;
+        };
+        if def.needs_admin {
+            apply_one(id, enabled, &mut script)?;
+        } else {
+            let mut scratch = RegScript::default();
+            apply_one(id, enabled, &mut scratch)?;
         }
+    }
 
-        if !script.is_empty() {
-            import_elevated(&script)?;
+    if !script.is_empty() {
+        import_elevated(&script)?;
+    }
+
+    // Verify (give UAC/reg a moment to finish).
+    let mut states = Vec::new();
+    for id in &ids {
+        if !defs.iter().any(|d| d.id == *id) {
+            continue;
         }
-
-        // Verify (give UAC/reg a moment to finish).
-        let mut states = Vec::new();
-        for id in &ids {
-            if !defs.iter().any(|d| d.id == *id) {
-                continue;
-            }
-            let mut active = tweak_active(id);
-            if active != enabled {
-                for _ in 0..6 {
-                    std::thread::sleep(std::time::Duration::from_millis(400));
-                    active = tweak_active(id);
-                    if active == enabled {
-                        break;
-                    }
+        let mut active = tweak_active(id);
+        if active != enabled {
+            for _ in 0..6 {
+                std::thread::sleep(std::time::Duration::from_millis(400));
+                active = tweak_active(id);
+                if active == enabled {
+                    break;
                 }
             }
-            states.push(TweakState {
-                id: id.clone(),
-                active,
-                error: if active != enabled {
-                    Some(
-                        "Windows didn't apply it — UAC was declined or the value is managed by policy"
-                            .to_string(),
-                    )
-                } else {
-                    None
-                },
-            });
         }
-        Ok(states)
+        states.push(TweakState {
+            id: id.clone(),
+            active,
+            error: if active != enabled {
+                Some(
+                    "Windows didn't apply it — UAC was declined or the value is managed by policy"
+                        .to_string(),
+                )
+            } else {
+                None
+            },
+        });
     }
+    Ok(states)
+}
 
-    #[cfg(not(windows))]
-    {
-        let _ = (ids, enabled);
-        Err("System tweaks are Windows-only".to_string())
-    }
+#[cfg(not(windows))]
+fn set_tweaks_impl(_ids: Vec<String>, _enabled: bool) -> Result<Vec<TweakState>, String> {
+    Err("System tweaks are Windows-only".to_string())
 }
 
 /// Mode presets: balanced = conservative, performance = safe tweaks on
@@ -1607,36 +1619,35 @@ pub fn set_game_mode(mode: String) -> Result<Vec<TweakState>, String> {
         "custom" => Vec::new(),
         other => return Err(format!("Unknown mode: {}", other)),
     };
+    set_game_mode_impl(ids)
+}
 
-    #[cfg(windows)]
-    {
-        if ids.is_empty() {
-            Ok(catalog()
-                .iter()
-                .map(|d| TweakState {
-                    id: d.id.to_string(),
-                    active: tweak_active(d.id),
-                    error: None,
-                })
-                .collect())
-        } else {
-            // Turn off safe tweaks that the preset doesn't include.
-            let safe_off: Vec<String> = catalog()
-                .iter()
-                .filter(|d| !d.needs_admin && !ids.contains(&d.id.to_string()))
-                .filter(|d| tweak_active(d.id))
-                .map(|d| d.id.to_string())
-                .collect();
-            if !safe_off.is_empty() {
-                let _ = set_tweaks(safe_off, false);
-            }
-            set_tweaks(ids, true)
-        }
+#[cfg(windows)]
+fn set_game_mode_impl(ids: Vec<String>) -> Result<Vec<TweakState>, String> {
+    if ids.is_empty() {
+        return Ok(catalog()
+            .iter()
+            .map(|d| TweakState {
+                id: d.id.to_string(),
+                active: tweak_active(d.id),
+                error: None,
+            })
+            .collect());
     }
+    // Turn off safe tweaks that the preset doesn't include.
+    let safe_off: Vec<String> = catalog()
+        .iter()
+        .filter(|d| !d.needs_admin && !ids.contains(&d.id.to_string()))
+        .filter(|d| tweak_active(d.id))
+        .map(|d| d.id.to_string())
+        .collect();
+    if !safe_off.is_empty() {
+        let _ = set_tweaks(safe_off, false);
+    }
+    set_tweaks(ids, true)
+}
 
-    #[cfg(not(windows))]
-    {
-        let _ = ids;
-        Err("Game Mode presets are Windows-only".to_string())
-    }
+#[cfg(not(windows))]
+fn set_game_mode_impl(_ids: Vec<String>) -> Result<Vec<TweakState>, String> {
+    Err("Game Mode presets are Windows-only".to_string())
 }
