@@ -21,7 +21,10 @@ jobs:
         include:
           - platform: windows-latest
             bundles: msi,nsis
-          - platform: macos-latest
+          # macos-13 (Intel) instead of macos-latest (arm64): arm64 runners hit
+          # long queue times under capacity constraints and get cancelled while
+          # queued. Intel dmg runs on both Intel and Apple Silicon Macs.
+          - platform: macos-13
             bundles: dmg
     runs-on: ${{ matrix.platform }}
 
