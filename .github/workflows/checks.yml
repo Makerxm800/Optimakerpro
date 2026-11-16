@@ -53,7 +53,9 @@ jobs:
         if: matrix.extra_target != '' && success()
         working-directory: src-tauri
         shell: bash
-        run: cargo check --all-targets --target ${{ matrix.extra_target }}
+        run: |
+          set -o pipefail
+          cargo check --all-targets --target ${{ matrix.extra_target }} 2>&1 | tee check-output-32.log
 
       # Debugging aid: publish the compiler output to a branch so errors can
       # be read from environments that can't download Actions logs.
@@ -65,6 +67,7 @@ jobs:
           git config user.email "ci-log-bot@users.noreply.github.com"
           git checkout -B ci-logs
           cp src-tauri/check-output.log "cargo-check-${{ matrix.os }}.log" 2>/dev/null || true
+          cp src-tauri/check-output-32.log "cargo-check-32-${{ matrix.os }}.log" 2>/dev/null || true
           git add -f cargo-check-*.log 2>/dev/null || true
           git commit -m "cargo check log (${{ matrix.os }}) for ${{ github.sha }}" || true
           git push --force origin ci-logs
