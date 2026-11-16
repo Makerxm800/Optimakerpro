@@ -1,7 +1,7 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "Taurie V2",
-  "version": "0.9.0-beta",
+  "version": "0.9.0",
   "identifier": "com.optimakerpro.taurie",
   "build": {
     "beforeDevCommand": "npm run dev",

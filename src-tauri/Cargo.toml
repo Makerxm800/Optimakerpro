@@ -1,6 +1,6 @@
 [package]
 name = "taurie-v2"
-version = "0.9.0-beta"
+version = "0.9.0"
 description = "Taurie V2 — Premium PC Optimizer (Beta)"
 authors = ["Optimakerpro"]
 edition = "2021"

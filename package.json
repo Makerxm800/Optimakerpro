@@ -1,7 +1,7 @@
 {
   "name": "taurie-v2",
   "private": true,
-  "version": "0.9.0-beta",
+  "version": "0.9.0",
   "type": "module",
   "description": "Taurie V2 — Premium PC Optimizer (Beta) for Windows and macOS, built with Tauri 2",
   "scripts": {
