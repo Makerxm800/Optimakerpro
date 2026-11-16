@@ -173,9 +173,10 @@ mod topology {
                 //     Flags(1) EfficiencyClass(1) Reserved(20) GroupCount(2)
                 //     GroupMask[0]: Mask(usize) ...
                 let class = buf[pos + 8 + 1];
-                let mask = usize::from_le_bytes(
-                    buf[pos + 32..pos + 40].try_into().unwrap_or([0; 8]),
-                );
+                // GroupMask.Mask is a ULONG_PTR: 8 bytes on x86-64, 4 on i686.
+                // Always parse the 8-byte window as u64 and truncate to usize.
+                let raw = u64::from_le_bytes(buf[pos + 32..pos + 40].try_into().unwrap_or([0; 8]));
+                let mask = raw as usize;
                 if mask != 0 {
                     out.push((mask, class));
                 }

@@ -1456,6 +1456,7 @@ function wire() {
   // Settings
   $("#checkUpdatesBtn").addEventListener("click", () => checkForUpdates(true));
   $("#installUpdateBtn").addEventListener("click", installUpdate);
+  $("#settingsCloseBtn").addEventListener("click", () => setPage("dashboard"));
 
   if (isTauri) {
     T.event.listen("clean-progress", (e) => {
