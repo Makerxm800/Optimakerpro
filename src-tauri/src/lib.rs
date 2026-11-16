@@ -15,33 +15,9 @@ pub struct SysState {
     pub system: Mutex<System>,
 }
 
-#[tauri::command]
-pub fn get_app_info() -> serde_json::Value {
-    serde_json::json!({
-        "name": "Optimakerpro",
-        "version": env!("CARGO_PKG_VERSION"),
-        "os": std::env::consts::OS,
-        "arch": std::env::consts::ARCH,
-    })
-}
-
-#[tauri::command]
-pub fn load_settings() -> Result<settings::Settings, String> {
-    let s = settings::load();
-    runtime::apply(&s);
-    Ok(s)
-}
-
-#[tauri::command]
-pub fn save_settings(new_settings: settings::Settings) -> Result<settings::Settings, String> {
-    settings::save(&new_settings)?;
-    runtime::apply(&new_settings);
-    #[cfg(windows)]
-    {
-        startup::set_launch_on_startup(new_settings.launch_on_startup)?;
-    }
-    Ok(new_settings)
-}
+// Commands are defined inside their own modules (settings::, system_info::).
+// Defining #[tauri::command] functions directly in the crate root makes the
+// macro-generated helper macros collide in the root macro namespace (E0255).
 
 pub fn run() {
     tauri::Builder::default()
@@ -51,9 +27,9 @@ pub fn run() {
             system: Mutex::new(System::new_all()),
         })
         .invoke_handler(tauri::generate_handler![
-            get_app_info,
-            load_settings,
-            save_settings,
+            system_info::get_app_info,
+            settings::load_settings,
+            settings::save_settings,
             system_info::get_system_info,
             system_info::top_processes,
             cleaner::scan_junk,

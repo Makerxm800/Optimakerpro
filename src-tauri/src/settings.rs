@@ -41,6 +41,24 @@ pub fn load() -> Settings {
         .unwrap_or_default()
 }
 
+#[tauri::command]
+pub fn load_settings() -> Result<Settings, String> {
+    let s = load();
+    crate::runtime::apply(&s);
+    Ok(s)
+}
+
+#[tauri::command]
+pub fn save_settings(new_settings: Settings) -> Result<Settings, String> {
+    save(&new_settings)?;
+    crate::runtime::apply(&new_settings);
+    #[cfg(windows)]
+    {
+        crate::startup::set_launch_on_startup(new_settings.launch_on_startup)?;
+    }
+    Ok(new_settings)
+}
+
 pub fn save(s: &Settings) -> Result<(), String> {
     let path = settings_path();
     if let Some(dir) = path.parent() {

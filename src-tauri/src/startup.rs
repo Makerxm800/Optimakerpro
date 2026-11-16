@@ -38,21 +38,12 @@ fn list_startup_impl() -> Result<Vec<StartupItem>, String> {
             Ok(k) => k,
             Err(_) => continue,
         };
-        if let Ok(values) = key.enum_values() {
-            for value in values.flatten() {
-                let (name, data) = value;
-                let command = match data {
-                    winreg::RegValue::Sz(s) => s,
-                    winreg::RegValue::ExpandSz(s) => s,
-                    winreg::RegValue::Binary(b) => String::from_utf8_lossy(&b).to_string(),
-                    other => format!("{:?}", other),
-                };
-                items.push(StartupItem {
-                    location: label.to_string(),
-                    name,
-                    command,
-                });
-            }
+        for (name, data) in key.enum_values().flatten() {
+            items.push(StartupItem {
+                location: label.to_string(),
+                name,
+                command: data.to_string(),
+            });
         }
     }
     items.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));

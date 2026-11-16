@@ -1,5 +1,5 @@
 use serde::Serialize;
-use tauri::{AppHandle, Emitter, Manager};
+use tauri::{AppHandle, Emitter};
 use tauri_plugin_updater::UpdaterExt;
 
 #[derive(Serialize)]
@@ -31,8 +31,10 @@ pub async fn check_for_updates(app: AppHandle) -> Result<UpdateInfo, String> {
             current_version: app.package_info().version.to_string(),
             available: true,
             version: Some(update.version.clone()),
-            notes: update.notes.clone(),
-            download_size: update.download_size.unwrap_or(0),
+            notes: update.body.clone(),
+            // The plugin exposes no total up front; the real total arrives with
+            // the first update-progress event (content_length in the callback).
+            download_size: 0,
             message: None,
         }),
         Ok(None) => Ok(up_to_date(&app, "You're on the latest version.")),
@@ -65,17 +67,12 @@ pub async fn install_update(app: AppHandle) -> Result<(), String> {
 
     tauri::async_runtime::spawn(async move {
         let mut downloaded: u64 = 0;
-        let known_total = update.download_size.unwrap_or(0);
         let progress_app = app.clone();
         let result = update
             .download_and_install(
                 |chunk, content_length| {
                     downloaded += chunk as u64;
-                    let total = if known_total > 0 {
-                        known_total
-                    } else {
-                        content_length.unwrap_or(0)
-                    };
+                    let total = content_length.unwrap_or(0);
                     let _ = progress_app.emit(
                         "update-progress",
                         serde_json::json!({ "downloaded": downloaded, "total": total }),

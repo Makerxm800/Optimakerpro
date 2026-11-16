@@ -119,12 +119,43 @@ function animateNumber(el, from, to, duration = 700) {
    Toasts
    ============================================================ */
 
-function toast(title, { body = "", kind = "", actions = [], sticky = false } = {}) {
+const TOAST_LIMIT = 3;
+const activeToasts = new Map();
+
+function toast(title, { body = "", kind = "", actions = [], sticky = false, dedupe = true } = {}) {
   const wrap = $("#toasts");
+  const key = `${kind}|${title}|${body}`;
+
+  // Identical toast already on screen → bump its counter, never stack a copy.
+  if (dedupe && !actions.length && activeToasts.has(key)) {
+    const rec = activeToasts.get(key);
+    rec.count += 1;
+    const badge = rec.el.querySelector(".toast-count");
+    if (badge) {
+      badge.textContent = `×${rec.count}`;
+      badge.classList.add("show");
+      badge.classList.remove("bump");
+      void badge.offsetWidth;
+      badge.classList.add("bump");
+    }
+    rec.restart();
+    return rec.dismiss;
+  }
+
+  // Keep the stack short: retire the oldest toast when at capacity.
+  if (wrap.children.length >= TOAST_LIMIT) {
+    const oldest = activeToasts.values().next().value;
+    if (oldest) oldest.dismiss(true);
+  }
+
   const el = document.createElement("div");
   el.className = `toast ${kind}`;
   el.innerHTML = `
-    <strong>${esc(title)}</strong>
+    <div class="toast-top">
+      <strong>${esc(title)}</strong>
+      <span class="toast-count"></span>
+      <span class="toast-x" title="Dismiss" role="button" aria-label="Dismiss">✕</span>
+    </div>
     ${body ? `<p>${esc(body)}</p>` : ""}
     ${actions.length ? `<div class="toast-actions"></div>` : ""}
   `;
@@ -134,21 +165,91 @@ function toast(title, { body = "", kind = "", actions = [], sticky = false } = {
     btn.className = `btn ${a.primary ? "btn-primary" : ""}`;
     btn.textContent = a.label;
     btn.addEventListener("click", () => {
-      dismiss();
+      dismiss(true);
       a.cb && a.cb();
     });
     actionRow.appendChild(btn);
   });
   wrap.appendChild(el);
 
-  function dismiss() {
-    el.classList.add("leaving");
-    setTimeout(() => el.remove(), 260);
+  const rec = { el, count: 1, timer: null, dismiss, restart: null };
+
+  function startTimer(ms) {
+    if (rec.timer) clearTimeout(rec.timer);
+    if (sticky || actions.length) return;
+    rec.timer = setTimeout(() => dismiss(), ms);
+  }
+  rec.restart = () => startTimer(4500);
+
+  function dismiss(instant = false) {
+    if (!activeToasts.has(key)) return;
+    activeToasts.delete(key);
+    if (rec.timer) clearTimeout(rec.timer);
+    if (instant) {
+      el.remove();
+    } else {
+      el.classList.add("leaving");
+      setTimeout(() => el.remove(), 250);
+    }
   }
 
-  if (!sticky && !actions.length) setTimeout(dismiss, 5000);
-  else if (!sticky) setTimeout(dismiss, 9000);
+  el.querySelector(".toast-x").addEventListener("click", () => dismiss());
+  // Hovering a toast pauses the auto-hide so it can be read in peace.
+  el.addEventListener("mouseenter", () => {
+    if (rec.timer) clearTimeout(rec.timer);
+    rec.timer = null;
+  });
+  el.addEventListener("mouseleave", () => rec.restart());
+
+  startTimer(kind === "err" ? 8000 : 4500);
+  activeToasts.set(key, rec);
   return dismiss;
+}
+
+/* One summary toast for a whole batch of tweak results — never N toasts. */
+function summarizeTweakResults(states, enabling, fallbackTitle = "") {
+  if (!states || !states.length) return;
+  const failed = states.filter((s) => s.error);
+  const ok = states.filter((s) => !s.error);
+
+  if (!failed.length && ok.length === 1) {
+    const def = state.catalog.find((d) => d.id === ok[0].id);
+    const t = (def && def.title) || fallbackTitle || "Tweak";
+    if (enabling) {
+      if (def && def.needs_restart) {
+        toast("Restart required", { kind: "good", body: `${t} applied — restart your PC to fully apply it.` });
+      } else {
+        toast("Applied", { kind: "good", body: `${t} is active and verified on your system.` });
+      }
+    } else {
+      toast("Reverted", { body: `${t} is back to Windows defaults.` });
+    }
+    return;
+  }
+
+  if (!failed.length) {
+    const restarts = ok.filter((s) => {
+      const d = state.catalog.find((c) => c.id === s.id);
+      return d && d.needs_restart;
+    }).length;
+    if (enabling && restarts) {
+      toast("Applied — restart needed", {
+        kind: "good",
+        body: `${ok.length} optimizations active — ${restarts} need${restarts === 1 ? "s" : ""} a PC restart to fully take effect.`,
+      });
+    } else {
+      toast(enabling ? "Applied" : "Reverted", {
+        kind: "good",
+        body: `${ok.length} optimization${ok.length === 1 ? "" : "s"} ${enabling ? "active and verified." : "back to Windows defaults."}`,
+      });
+    }
+    return;
+  }
+
+  toast("Some tweaks didn't apply", {
+    kind: "err",
+    body: `${failed.length} of ${states.length} failed — ${failed[0].error}`,
+  });
 }
 
 /* ============================================================
@@ -315,34 +416,27 @@ async function demoInvoke(cmd, args = {}) {
       const ids = args.ids || [];
       const enabled = !!args.enabled;
       for (const id of ids) demoTweakStates[id] = enabled;
-      const def = demoCatalog.find((d) => ids.includes(d.id));
-      if (enabled && def && def.needs_restart) {
-        toast("Restart required", { kind: "good", body: `${def.title} applied — restart your PC to fully apply it.` });
-      } else if (enabled && def) {
-        toast(def.needs_admin ? "Applied with admin approval" : "Applied", { kind: "good", body: def.title });
-      } else if (def) {
-        toast("Reverted", { body: def.title });
-      }
-      return demoCatalog.map((d) => ({ id: d.id, active: !!demoTweakStates[d.id], error: null }));
+      // Mirror the backend: only the requested ids come back, and the mock
+      // NEVER fires UI notifications (the real command doesn't either).
+      return ids.map((id) => ({ id, active: !!demoTweakStates[id], error: null }));
     }
     case "set_game_mode": {
       const presets = {
         balanced: ["windows_game_mode", "game_dvr_off"],
         performance: ["windows_game_mode", "game_dvr_off", "power_plan_high", "startup_delay_off", "background_apps_off"],
-        custom: [],
       };
-      const ids = presets[args.mode] || [];
-      for (const [id, on] of Object.entries(demoTweakStates)) {
-        const def = demoCatalog.find((d) => d.id === id);
-        if (def && !def.needs_admin) demoTweakStates[id] = ids.includes(id);
+      if (args.mode === "custom") {
+        // Custom touches nothing (mirrors the backend no-op).
+        return demoCatalog.map((d) => ({ id: d.id, active: !!demoTweakStates[d.id], error: null }));
       }
-      if (ids.length) {
-        toast(`${args.mode[0].toUpperCase() + args.mode.slice(1)} mode applied`, {
-          kind: "good",
-          body: `${ids.length} optimizations activated.`,
-        });
+      const ids = presets[args.mode];
+      if (!ids) throw new Error(`Unknown mode: ${args.mode}`);
+      // Turn off safe tweaks the preset doesn't include (mirrors the backend).
+      for (const def of demoCatalog) {
+        if (!def.needs_admin && !ids.includes(def.id)) demoTweakStates[def.id] = false;
       }
-      return demoCatalog.map((d) => ({ id: d.id, active: !!demoTweakStates[d.id], error: null }));
+      for (const id of ids) demoTweakStates[id] = true;
+      return ids.map((id) => ({ id, active: true, error: null }));
     }
     case "get_core_topology":
       return { cores: 8, logical: 16, e_cores: 0, smt: true };
@@ -974,19 +1068,8 @@ async function toggleTweak(id) {
     const states = await invoke("set_tweaks", { ids: [id], enabled: enabling });
     states.forEach((s) => {
       state.tweakStates[s.id] = s;
-      if (s.error) {
-        toast("Not applied", { kind: "err", body: `${def.title}: ${s.error}` });
-      } else if (enabling && def.needs_restart) {
-        toast("Restart your PC to fully apply it", {
-          kind: "good",
-          body: `${def.title} is active now — restart when convenient.`,
-        });
-      } else if (enabling) {
-        toast(`${def.title} applied`, { kind: "good", body: def.needs_admin ? "With admin approval — changes verified." : "Change verified on your system." });
-      } else {
-        toast("Reverted", { body: `${def.title} is back to Windows defaults.` });
-      }
     });
+    summarizeTweakResults(states, enabling, def.title);
     renderTweaks();
   } catch (e) {
     toast("Couldn't apply", { body: String(e), kind: "err" });
@@ -1166,10 +1249,11 @@ async function switchMode(mode) {
     const states = await invoke("set_game_mode", { mode: mode });
     states.forEach((s) => {
       state.tweakStates[s.id] = s;
-      if (s.error) {
-        toast("Not applied", { kind: "err", body: s.error });
-      }
     });
+    const failed = states.filter((s) => s.error);
+    if (failed.length) {
+      toast("Not applied", { kind: "err", body: failed[0].error });
+    }
     state.mode = mode;
     renderTweaks();
     if (mode !== "custom") {
@@ -1178,6 +1262,8 @@ async function switchMode(mode) {
         kind: "good",
         body: `${activeCount} optimizations active. Advanced tweaks stay opt-in.`,
       });
+    } else {
+      toast("Custom mode", { body: "Toggle the tweaks you want — nothing was changed for you." });
     }
   } catch (e) {
     toast("Couldn't switch mode", { body: String(e), kind: "err" });

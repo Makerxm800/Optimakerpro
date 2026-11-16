@@ -500,7 +500,7 @@ fn detect_epic() -> Vec<GameEntry> {
     };
     for entry in entries.flatten() {
         let path = entry.path();
-        if path.extension().map(|e| e.to_string_lossy().to_lowercase()) != Some("item") {
+        if !path.extension().map(|e| e.to_string_lossy().eq_ignore_ascii_case("item")).unwrap_or(false) {
             continue;
         }
         let Ok(text) = std::fs::read_to_string(&path) else {
@@ -532,29 +532,27 @@ fn detect_riot() -> Vec<GameEntry> {
     ) else {
         return games;
     };
-    if let Ok(subkeys) = uninstall.enum_keys() {
-        for sub in subkeys.flatten() {
-            if let Ok(key) = uninstall.open_subkey_with_flags(&sub, KEY_READ) {
-                let Ok(display) = key.get_value::<String, _>("DisplayName") else {
-                    continue;
-                };
-                let lower = display.to_lowercase();
-                if !(lower.contains("league of legends") || lower.contains("valorant")) {
-                    continue;
-                }
-                if let Ok(location) = key.get_value::<String, _>("InstallLocation") {
-                    let dir = PathBuf::from(&location);
-                    for candidate in [
-                        "VALORANT-Win64-Shipping.exe",
-                        "VALORANT.exe",
-                        "LeagueClient.exe",
-                        "League of Legends.exe",
-                    ] {
-                        let exe = dir.join(candidate);
-                        if exe.is_file() {
-                            games.push(make_entry(display.clone(), exe, "Riot"));
-                            break;
-                        }
+    for sub in uninstall.enum_keys().flatten() {
+        if let Ok(key) = uninstall.open_subkey_with_flags(&sub, KEY_READ) {
+            let Ok(display) = key.get_value::<String, _>("DisplayName") else {
+                continue;
+            };
+            let lower = display.to_lowercase();
+            if !(lower.contains("league of legends") || lower.contains("valorant")) {
+                continue;
+            }
+            if let Ok(location) = key.get_value::<String, _>("InstallLocation") {
+                let dir = PathBuf::from(&location);
+                for candidate in [
+                    "VALORANT-Win64-Shipping.exe",
+                    "VALORANT.exe",
+                    "LeagueClient.exe",
+                    "League of Legends.exe",
+                ] {
+                    let exe = dir.join(candidate);
+                    if exe.is_file() {
+                        games.push(make_entry(display.clone(), exe, "Riot"));
+                        break;
                     }
                 }
             }
@@ -641,7 +639,7 @@ pub fn add_game_from_path(path: String) -> Result<GameEntry, String> {
     if !exe.is_file() {
         return Err("That file doesn't exist".to_string());
     }
-    if exe.extension().map(|e| e.to_string_lossy().to_lowercase()) != Some("exe") {
+    if !exe.extension().map(|e| e.to_string_lossy().eq_ignore_ascii_case("exe")).unwrap_or(false) {
         return Err("Pick the game's .exe file".to_string());
     }
     let entry = make_entry(
@@ -1154,9 +1152,9 @@ fn import_elevated(script: &RegScript) -> Result<(), String> {
 
     {
         let mut f = std::fs::File::create(&path).map_err(|e| e.to_string())?;
-        f.write_all(&[0xFF, 0xFE])?; // UTF-16 LE BOM — required by reg import
+        f.write_all(&[0xFF, 0xFE]).map_err(|e| e.to_string())?; // UTF-16 LE BOM — required by reg import
         for unit in content.encode_utf16() {
-            f.write_all(&unit.to_le_bytes())?;
+            f.write_all(&unit.to_le_bytes()).map_err(|e| e.to_string())?;
         }
     }
 
@@ -1274,19 +1272,17 @@ fn apply_one(id: &str, enable: bool, script: &mut RegScript) -> Result<(), Strin
                     KEY_READ,
                 )
                 .map_err(|e| e.to_string())?;
-            if let Ok(subkeys) = interfaces.enum_keys() {
-                for sub in subkeys.flatten() {
-                    let full = format!(
-                        r"HKLM\SYSTEM\CurrentControlSet\Services\Tcpip\Parameters\Interfaces\{}",
-                        sub
-                    );
-                    if enable {
-                        script.add_dword(&full, "TcpAckFrequency", 1);
-                        script.add_dword(&full, "TCPNoDelay", 1);
-                    } else {
-                        script.delete(&full, "TcpAckFrequency");
-                        script.delete(&full, "TCPNoDelay");
-                    }
+            for sub in interfaces.enum_keys().flatten() {
+                let full = format!(
+                    r"HKLM\SYSTEM\CurrentControlSet\Services\Tcpip\Parameters\Interfaces\{}",
+                    sub
+                );
+                if enable {
+                    script.add_dword(&full, "TcpAckFrequency", 1);
+                    script.add_dword(&full, "TCPNoDelay", 1);
+                } else {
+                    script.delete(&full, "TcpAckFrequency");
+                    script.delete(&full, "TCPNoDelay");
                 }
             }
         }
@@ -1475,13 +1471,11 @@ fn tweak_active(id: &str) -> bool {
                 r"SYSTEM\CurrentControlSet\Services\Tcpip\Parameters\Interfaces",
                 KEY_READ,
             ) {
-                if let Ok(subkeys) = interfaces.enum_keys() {
-                    for sub in subkeys.flatten() {
-                        if let Ok(key) = interfaces.open_subkey_with_flags(&sub, KEY_READ) {
-                            if let Ok(v) = key.get_value::<u32, _>("TCPNoDelay") {
-                                if v == 1 {
-                                    return true;
-                                }
+                for sub in interfaces.enum_keys().flatten() {
+                    if let Ok(key) = interfaces.open_subkey_with_flags(&sub, KEY_READ) {
+                        if let Ok(v) = key.get_value::<u32, _>("TCPNoDelay") {
+                            if v == 1 {
+                                return true;
                             }
                         }
                     }

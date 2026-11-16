@@ -4,6 +4,16 @@ use tauri::State;
 
 use crate::SysState;
 
+#[tauri::command]
+pub fn get_app_info() -> serde_json::Value {
+    serde_json::json!({
+        "name": "Optimakerpro",
+        "version": env!("CARGO_PKG_VERSION"),
+        "os": std::env::consts::OS,
+        "arch": std::env::consts::ARCH,
+    })
+}
+
 #[derive(Serialize, Clone)]
 pub struct DiskInfo {
     pub mount: String,
