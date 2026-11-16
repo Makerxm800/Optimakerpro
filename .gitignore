@@ -1,0 +1,13 @@
+# Build artifacts
+node_modules/
+src-tauri/target/
+src-tauri/gen/
+
+# Editor / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Local logs & temp
+*.log

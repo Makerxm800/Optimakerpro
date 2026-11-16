@@ -1,0 +1,16 @@
+{
+  "name": "optimakerpro",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Optimakerpro — a fast, lightweight PC optimizer for Windows (32-bit & 64-bit)",
+  "scripts": {
+    "tauri": "tauri",
+    "dev": "tauri dev",
+    "build": "tauri build",
+    "build:x64": "tauri build --target x86_64-pc-windows-msvc --bundles nsis",
+    "build:x86": "tauri build --target i686-pc-windows-msvc --bundles nsis"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2.9.6"
+  }
+}
