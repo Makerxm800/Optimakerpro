@@ -85,7 +85,7 @@ mod imp {
             };
 
             if enabled {
-                if key.set_value(name, path.as_str()).is_ok() {
+                if key.set_value(name, path).is_ok() {
                     return StartupToggleResult {
                         name: name.to_string(),
                         enabled: true,
