@@ -51,28 +51,33 @@ jobs:
           key: taurie-${{ runner.os }}-${{ hashFiles('src-tauri/Cargo.toml') }}
           restore-keys: taurie-${{ runner.os }}-
 
+      # shell: bash is required on windows-latest (default shell is PowerShell,
+      # which does not support pipefail/tee used below).
       - name: Build with Tauri
+        shell: bash
         run: |
           set -o pipefail
           npx tauri build --bundles ${{ matrix.bundles }} 2>&1 | tee /tmp/tauri-build.log
 
       - name: Push build log to diagnostics branch
         if: failure()
+        shell: bash
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          cp /tmp/tauri-build.log tauri-build-diagnostics.txt
+          cp /tmp/tauri-build.log tauri-build-diagnostics.txt 2>/dev/null || true
           git config user.email "ci@optimakerpro.dev"
           git config user.name "Taurie CI"
           git add tauri-build-diagnostics.txt
-          git commit -q -m "ci: capture tauri build diagnostics (${{ matrix.platform }})"
+          git commit -q -m "ci: capture tauri build diagnostics (${{ matrix.platform }})" || true
           git push "https://x-access-token:${GITHUB_TOKEN}@github.com/${{ github.repository }}.git" \
             HEAD:refs/heads/ci-build-diagnostics || true
 
       - name: Attach build error to release
         if: failure() && startsWith(github.ref, 'refs/tags/')
+        shell: bash
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           {
             echo '## Build diagnostics (${{ matrix.platform }})'
@@ -80,12 +85,9 @@ jobs:
             tail -60 /tmp/tauri-build.log
             echo '```'
           } > /tmp/build-error.md
-          BODY=$(python3 -c "import json; print(json.dumps({'body': open('/tmp/build-error.md').read()}))")
-          curl -sS -X PATCH \
-            -H "Authorization: Bearer $GITHUB_TOKEN" \
-            -H "Accept: application/vnd.github+json" \
-            "https://api.github.com/repos/${{ github.repository }}/releases/tags/${{ github.ref_name }}" \
-            -d "$BODY"
+          gh release edit "${{ github.ref_name }}" \
+            --repo "${{ github.repository }}" \
+            --notes-file /tmp/build-error.md
 
       - name: Publish release assets
         if: startsWith(github.ref, 'refs/tags/')
