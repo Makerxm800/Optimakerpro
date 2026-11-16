@@ -299,7 +299,14 @@ async function demoInvoke(cmd, args = {}) {
     case "remove_startup_item":
       return null;
     case "check_for_updates":
-      return { current_version: "1.0.0", available: false, version: null, notes: null, download_size: 0, message: "You're on the latest version. (preview data)" };
+      return {
+        current_version: "1.0.0",
+        available: true,
+        version: "1.0.1",
+        notes: "Game Mode fixes, centered settings menu, native window frame.",
+        download_size: 6_740_000,
+        message: null,
+      };
     case "get_tweak_catalog":
       return demoCatalog;
     case "get_tweak_states":
@@ -1245,6 +1252,40 @@ async function installUpdate() {
   $("#checkUpdatesBtn").classList.add("busy");
   wrap.classList.remove("hidden");
   label.textContent = "Downloading update…";
+  note.textContent = "";
+  note.className = "update-note muted";
+
+  if (!isTauri) {
+    // Preview mode: simulate a real download + install so the flow is visible.
+    const total = 6_740_000;
+    let done = 0;
+    bar.classList.remove("indeterminate");
+    await sleep(250);
+    while (done < total) {
+      done = Math.min(total, done + 220_000 + Math.random() * 500_000);
+      bar.style.transition = "width 0.25s ease";
+      bar.style.width = `${(done / total) * 100}%`;
+      label.textContent = `Downloading… ${fmtBytes(done)} / ${fmtBytes(total)}`;
+      await sleep(140);
+    }
+    label.textContent = "Downloaded — installing…";
+    await sleep(1400);
+    label.textContent = "Installed — restarting Optimakerpro…";
+    $("#checkUpdatesBtn").classList.remove("busy");
+    toast("Update installed", { kind: "good", body: "Optimakerpro v1.0.1 is now the current version." });
+    setUpdateStatus("You're on the latest version (v1.0.1).");
+    $("#versionPill").textContent = "v1.0.1";
+    const about = $("#aboutInfo");
+    if (about) {
+      about.textContent = `Version 1.0.1 · Windows (x86_64)`;
+    }
+    setTimeout(() => {
+      wrap.classList.add("hidden");
+      bar.style.width = "0%";
+    }, 1600);
+    return;
+  }
+
   bar.classList.add("indeterminate");
   try {
     await invoke("install_update");
@@ -1330,13 +1371,7 @@ function wire() {
   $("#checkUpdatesBtn").addEventListener("click", () => checkForUpdates(true));
   $("#installUpdateBtn").addEventListener("click", installUpdate);
 
-  // Window controls (Tauri only)
   if (isTauri) {
-    const win = T.window.getCurrentWindow();
-    $("#winMin").addEventListener("click", () => win.minimize());
-    $("#winMax").addEventListener("click", () => win.toggleMaximize());
-    $("#winClose").addEventListener("click", () => win.close());
-
     T.event.listen("clean-progress", (e) => {
       const { id } = e.payload || {};
       const row = $(`#cleanList .clean-row[data-id="${CSS.escape(id)}"]`);
@@ -1417,20 +1452,32 @@ function updateGameBannerFromEvent(name) {
 
 async function init() {
   if (!isTauri) $("#demoBadge").classList.remove("hidden");
-  wire();
-  await loadSettings();
 
   try {
-    const info = await invoke("get_app_info");
-    $("#versionPill").textContent = `v${info.version}`;
-    $("#aboutInfo").innerHTML =
-      `<strong>Optimakerpro</strong> v${esc(info.version)}<br>` +
-      `A fast, lightweight PC optimizer.<br>` +
-      `Running on ${esc(info.os)} (${esc(info.arch)}).`;
-    setUpdateStatus(`Current version: v${info.version}`);
-  } catch {
-    $("#versionPill").textContent = "v1.0.0";
+    wire();
+  } catch (e) {
+    console.error("wire failed", e);
   }
+
+  try {
+    await loadSettings();
+  } catch (e) {
+    console.error("settings failed", e);
+  }
+
+  let version = "1.0.0";
+  try {
+    const info = await invoke("get_app_info");
+    version = info.version || version;
+  } catch {
+    /* keep fallback version */
+  }
+  $("#versionPill").textContent = `v${version}`;
+  const about = $("#aboutInfo");
+  if (about) {
+    about.textContent = `Version ${version} · Windows (x86_64 & x86)`;
+  }
+  setUpdateStatus(`Current version: v${version}`);
 
   renderActivity();
   renderHistory();
@@ -1439,7 +1486,7 @@ async function init() {
 
   // Quiet update check shortly after launch.
   setTimeout(() => {
-    if (isTauri) checkForUpdates(false);
+    checkForUpdates(false);
   }, 4000);
 }
 

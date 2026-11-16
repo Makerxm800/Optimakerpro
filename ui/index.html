@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Optimakerpro</title>
-  <link rel="stylesheet" href="style.css" />
+  <link rel="stylesheet" href="style.css?v=5" />
   <link rel="icon" href="logo.png" />
 </head>
 <body>
@@ -51,24 +51,13 @@
 
     <!-- ============ MAIN ============ -->
     <div class="main">
-      <header class="topbar" data-tauri-drag-region>
-        <h1 class="page-title" id="pageTitle" data-tauri-drag-region>Dashboard</h1>
+      <header class="topbar">
+        <h1 class="page-title" id="pageTitle">Dashboard</h1>
         <div class="topbar-actions">
           <button class="chip" id="silentChip" title="Pauses auto-actions and notifications">
             <svg viewBox="0 0 24 24"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>
             <span>Silent mode</span>
           </button>
-          <div class="window-controls">
-            <button class="win-btn" id="winMin" aria-label="Minimize" tabindex="-1">
-              <svg viewBox="0 0 24 24"><path d="M5 12h14"/></svg>
-            </button>
-            <button class="win-btn" id="winMax" aria-label="Maximize" tabindex="-1">
-              <svg viewBox="0 0 24 24"><rect x="5" y="5" width="14" height="14" rx="2"/></svg>
-            </button>
-            <button class="win-btn close" id="winClose" aria-label="Close" tabindex="-1">
-              <svg viewBox="0 0 24 24"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
-            </button>
-          </div>
         </div>
       </header>
 
@@ -327,84 +316,95 @@
 
         <!-- ============ SETTINGS ============ -->
         <section class="page" id="page-settings">
-          <div class="card settings-section">
-            <h3>App updates</h3>
-            <p class="muted" id="updateStatus">Current version: v—</p>
-            <div class="mini-progress hidden" id="updateProgressWrap">
-              <div class="bar"><i id="updateBar"></i></div>
-              <span class="mini-progress-label" id="updateProgressLabel"></span>
-            </div>
-            <div class="settings-actions">
-              <button class="btn" id="checkUpdatesBtn">
-                <svg viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/></svg>
-                Check for updates
-              </button>
-              <button class="btn btn-primary hidden" id="installUpdateBtn">
-                <svg viewBox="0 0 24 24"><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M5 21h14"/></svg>
-                Download &amp; install
-              </button>
-            </div>
-            <p class="update-note muted" id="updateNote"></p>
-          </div>
+          <div class="settings-wrap">
 
-          <div class="card settings-section">
-            <h3>General</h3>
-            <div class="setting-row">
-              <div class="setting-text">
-                <strong>Launch on startup</strong>
-                <span>Start Optimakerpro automatically when you sign in (Windows)</span>
+            <div class="card settings-section">
+              <h3><span class="section-ico">⬇</span>App updates</h3>
+              <p class="muted" id="updateStatus">Current version: v—</p>
+              <div class="mini-progress hidden" id="updateProgressWrap">
+                <div class="bar"><i id="updateBar"></i></div>
+                <span class="mini-progress-label" id="updateProgressLabel"></span>
               </div>
-              <button class="switch" role="switch" aria-checked="false" data-setting="launchOnStartup" aria-label="Toggle launch on startup"><span class="knob"></span></button>
-            </div>
-            <div class="setting-row">
-              <div class="setting-text">
-                <strong>Reduce animations</strong>
-                <span>Tone down motion across the app</span>
+              <div class="settings-actions">
+                <button class="btn" id="checkUpdatesBtn">
+                  <svg viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/></svg>
+                  Check for updates
+                </button>
+                <button class="btn btn-primary hidden" id="installUpdateBtn">
+                  <svg viewBox="0 0 24 24"><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M5 21h14"/></svg>
+                  Download &amp; install
+                </button>
               </div>
-              <button class="switch" role="switch" aria-checked="false" data-setting="reduceAnimations" aria-label="Toggle reduce animations"><span class="knob"></span></button>
+              <p class="update-note muted" id="updateNote"></p>
             </div>
-            <div class="setting-row">
-              <div class="setting-text">
-                <strong>Cleanup interval</strong>
-                <span>How often Auto Cleanup runs when enabled</span>
-              </div>
-              <select class="select" id="cleanupInterval" aria-label="Cleanup interval">
-                <option value="2">Every 2 hours</option>
-                <option value="6">Every 6 hours</option>
-                <option value="12">Every 12 hours</option>
-                <option value="24">Every 24 hours</option>
-              </select>
-            </div>
-          </div>
 
-          <div class="card settings-section">
-            <h3>Features</h3>
-            <div class="setting-row">
-              <div class="setting-text">
-                <strong>Auto Memory Boost</strong>
-                <span>Trims working sets when memory usage exceeds 85%</span>
+            <div class="card settings-section">
+              <h3><span class="section-ico">⚙</span>General</h3>
+              <div class="setting-row">
+                <div class="setting-text">
+                  <strong>Launch on startup</strong>
+                  <span>Start Optimakerpro automatically when you sign in (Windows)</span>
+                </div>
+                <button class="switch" role="switch" aria-checked="false" data-setting="launchOnStartup" aria-label="Toggle launch on startup"><span class="knob"></span></button>
               </div>
-              <button class="switch" role="switch" aria-checked="false" data-setting="autoMemoryBoost" aria-label="Toggle Auto Memory Boost"><span class="knob"></span></button>
-            </div>
-            <div class="setting-row">
-              <div class="setting-text">
-                <strong>Auto Cleanup</strong>
-                <span>Clears temp files, update leftovers and caches on a schedule</span>
+              <div class="setting-row">
+                <div class="setting-text">
+                  <strong>Reduce animations</strong>
+                  <span>Tone down motion across the app</span>
+                </div>
+                <button class="switch" role="switch" aria-checked="false" data-setting="reduceAnimations" aria-label="Toggle reduce animations"><span class="knob"></span></button>
               </div>
-              <button class="switch" role="switch" aria-checked="false" data-setting="autoCleanup" aria-label="Toggle Auto Cleanup"><span class="knob"></span></button>
-            </div>
-            <div class="setting-row">
-              <div class="setting-text">
-                <strong>Silent / Game Mode</strong>
-                <span>Pauses all background activity and notifications</span>
+              <div class="setting-row">
+                <div class="setting-text">
+                  <strong>Cleanup interval</strong>
+                  <span>How often Auto Cleanup runs when enabled</span>
+                </div>
+                <select class="select" id="cleanupInterval" aria-label="Cleanup interval">
+                  <option value="2">Every 2 hours</option>
+                  <option value="6">Every 6 hours</option>
+                  <option value="12">Every 12 hours</option>
+                  <option value="24">Every 24 hours</option>
+                </select>
               </div>
-              <button class="switch" role="switch" aria-checked="false" data-setting="silentMode" aria-label="Toggle Silent or Game Mode"><span class="knob"></span></button>
             </div>
-          </div>
 
-          <div class="card settings-section">
-            <h3>About</h3>
-            <p class="muted" id="aboutInfo">Optimakerpro</p>
+            <div class="card settings-section">
+              <h3><span class="section-ico">✦</span>Features</h3>
+              <div class="setting-row">
+                <div class="setting-text">
+                  <strong>Auto Memory Boost</strong>
+                  <span>Trims working sets when memory usage exceeds 85%</span>
+                </div>
+                <button class="switch" role="switch" aria-checked="false" data-setting="autoMemoryBoost" aria-label="Toggle Auto Memory Boost"><span class="knob"></span></button>
+              </div>
+              <div class="setting-row">
+                <div class="setting-text">
+                  <strong>Auto Cleanup</strong>
+                  <span>Clears temp files, update leftovers and caches on a schedule</span>
+                </div>
+                <button class="switch" role="switch" aria-checked="false" data-setting="autoCleanup" aria-label="Toggle Auto Cleanup"><span class="knob"></span></button>
+              </div>
+              <div class="setting-row">
+                <div class="setting-text">
+                  <strong>Silent Mode</strong>
+                  <span>Pauses all background activity and notifications</span>
+                </div>
+                <button class="switch" role="switch" aria-checked="false" data-setting="silentMode" aria-label="Toggle Silent Mode"><span class="knob"></span></button>
+              </div>
+            </div>
+
+            <div class="card settings-section about-card">
+              <h3><span class="section-ico">i</span>About</h3>
+              <div class="about-body">
+                <img src="logo.png" alt="Optimakerpro logo" draggable="false" />
+                <div class="about-text">
+                  <strong id="aboutName">Optimakerpro</strong>
+                  <span id="aboutInfo">Checking version…</span>
+                  <span class="muted about-tag">A fast, lightweight PC optimizer. No accounts, no telemetry.</span>
+                </div>
+              </div>
+            </div>
+
           </div>
         </section>
 
@@ -418,6 +418,6 @@
   </div>
 
   <div class="toasts" id="toasts"></div>
-  <script src="main.js"></script>
+  <script src="main.js?v=5"></script>
 </body>
 </html>
