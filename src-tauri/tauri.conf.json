@@ -1,0 +1,49 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Taurie V2",
+  "version": "0.9.0-beta",
+  "identifier": "com.optimakerpro.taurie",
+  "build": {
+    "beforeDevCommand": "npm run dev",
+    "devUrl": "http://localhost:1420",
+    "beforeBuildCommand": "npm run build",
+    "frontendDist": "../dist"
+  },
+  "app": {
+    "withGlobalTauri": true,
+    "windows": [
+      {
+        "label": "main",
+        "title": "Taurie V2 — Premium PC Optimizer",
+        "width": 1280,
+        "height": 820,
+        "minWidth": 1040,
+        "minHeight": 700,
+        "resizable": true,
+        "center": true,
+        "transparent": false,
+        "decorations": true,
+        "alwaysOnTop": false
+      }
+    ],
+    "security": {
+      "csp": null
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ],
+    "category": "Utility",
+    "shortDescription": "Premium PC optimizer (Beta)",
+    "longDescription": "Taurie V2 is a premium system optimizer with junk cleaning, memory boosting, startup management, real-time protection and scheduled maintenance for Windows and macOS.",
+    "copyright": "© 2026 Optimakerpro",
+    "macOSPrivateApi": false
+  }
+}

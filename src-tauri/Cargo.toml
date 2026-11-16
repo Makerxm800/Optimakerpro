@@ -1,0 +1,35 @@
+[package]
+name = "taurie-v2"
+version = "0.9.0-beta"
+description = "Taurie V2 — Premium PC Optimizer (Beta)"
+authors = ["Optimakerpro"]
+edition = "2021"
+rust-version = "1.77"
+
+[lib]
+name = "taurie_v2_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+sysinfo = "0.31"
+
+[target.'cfg(windows)'.dependencies]
+winreg = "0.52"
+
+[features]
+# this feature is used for production builds or when `devUrl` points to
+# a local address that does not require the dev server
+custom-protocol = ["tauri/custom-protocol"]
+
+[profile.release]
+panic = "abort"
+codegen-units = 1
+lto = true
+opt-level = "s"
+strip = true
