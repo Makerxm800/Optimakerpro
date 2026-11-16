@@ -58,7 +58,7 @@ jobs:
       - name: Comment Rust errors on PR
         if: failure() && github.event_name == 'pull_request'
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           {
             echo '**Rust check failed** - last 80 lines of cargo check:'
@@ -66,6 +66,9 @@ jobs:
             tail -80 /tmp/cargo-check.log
             echo '```'
           } > /tmp/cargo-comment.md
-          gh pr comment "${{ github.event.pull_request.number }}" \
-            --repo "${{ github.repository }}" \
-            --body "$(cat /tmp/cargo-comment.md)"
+          BODY=$(python3 -c "import json; print(json.dumps({'body': open('/tmp/cargo-comment.md').read()}))")
+          curl -sS -X POST \
+            -H "Authorization: Bearer $GITHUB_TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            "https://api.github.com/repos/${{ github.repository }}/issues/${{ github.event.pull_request.number }}/comments" \
+            -d "$BODY"
