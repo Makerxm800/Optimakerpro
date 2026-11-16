@@ -51,6 +51,32 @@ npm run tauri build -- --bundles msi,nsis
 npm run tauri build -- --bundles dmg
 ```
 
+## Releases (GitHub Actions)
+
+The repo ships a `Release` workflow (`.github/workflows/release.yml`) that
+builds the desktop app and publishes the binaries to a **GitHub Release**:
+
+- **Windows** — `.msi` installer + NSIS `.exe`
+- **macOS** — `.dmg` disk image
+
+To cut a release, push a version tag:
+
+```bash
+git tag v0.9.0-beta
+git push origin v0.9.0-beta
+```
+
+The workflow automatically:
+
+1. Builds the frontend and compiles the Tauri app on `windows-latest` and
+   `macos-latest`
+2. Attaches the Windows installer (`.msi`, `.exe`) and macOS image (`.dmg`)
+   to the GitHub Release for the tag
+3. Uploads the artifacts so they're also browsable from the Actions run
+
+A `CI` workflow (`.github/workflows/ci.yml`) typechecks/builds the frontend
+and runs `cargo check` on the Rust backend on every push and PR.
+
 ## Web preview (no Rust needed)
 
 ```bash
