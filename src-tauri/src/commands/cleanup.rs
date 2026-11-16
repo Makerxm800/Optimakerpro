@@ -158,7 +158,7 @@ pub fn clean_junk(item_ids: Vec<String>) -> CleanupResult {
     let id_map: Vec<(String, PathBuf)> = roots
         .into_iter()
         .enumerate()
-        .map(|(i, (name, path, _))| (format!("junk-{}", i), path))
+        .map(|(i, (_, path, _))| (format!("junk-{}", i), path))
         .collect();
 
     let mut removed_bytes = 0u64;

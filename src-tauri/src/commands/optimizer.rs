@@ -63,12 +63,11 @@ pub fn boost_memory() -> BoostResult {
 
 #[tauri::command]
 pub fn set_schedule(enabled: bool, frequency: String) -> ScheduleResult {
-    let exe = std::env::current_exe()
-        .map(|p| p.to_string_lossy().to_string())
-        .unwrap_or_default();
-
     #[cfg(target_os = "windows")]
     {
+        let exe = std::env::current_exe()
+            .map(|p| p.to_string_lossy().to_string())
+            .unwrap_or_default();
         if enabled {
             let freq = match frequency.as_str() {
                 "daily" => "DAILY",
@@ -118,6 +117,9 @@ pub fn set_schedule(enabled: bool, frequency: String) -> ScheduleResult {
 
     #[cfg(target_os = "macos")]
     {
+        let exe = std::env::current_exe()
+            .map(|p| p.to_string_lossy().to_string())
+            .unwrap_or_default();
         let plist_path = std::env::var_os("HOME")
             .map(|h| {
                 std::path::PathBuf::from(h)

@@ -171,7 +171,7 @@ mod imp {
             };
             let disabled = disabled_dir().unwrap_or_default();
             let is_disabled = path.starts_with(&disabled);
-            let label = extract_label(&content, entry.file_name().to_string_lossy());
+            let label = extract_label(&content, entry.file_name().to_string_lossy().as_ref());
             let command = extract_command(&content);
             apps.push(StartupApp {
                 name: label,

@@ -54,16 +54,14 @@ pub fn get_system_stats() -> SystemStats {
         .list()
         .iter()
         .find(|d| d.mount_point() == Path::new("/"))
-        .or_else(|| {
-            disks
-                .list()
-                .iter()
-                .find(|d| !d.name().to_string_lossy().contains("Removable"))
-        })
+        .or_else(|| disks.list().iter().find(|d| !d.is_removable()))
         .or_else(|| disks.list().iter().next());
 
     let (disk_used, disk_total) = match disk {
-        Some(d) => (d.used_space(), d.total_space()),
+        Some(d) => (
+            d.total_space().saturating_sub(d.available_space()),
+            d.total_space(),
+        ),
         None => (0, 0),
     };
     let disk_percent = if disk_total > 0 {
@@ -82,7 +80,7 @@ pub fn get_system_stats() -> SystemStats {
         os_version: System::os_version().unwrap_or_else(|| "—".to_string()),
         architecture: std::env::consts::ARCH.to_string(),
         cpu_model,
-        cpu_percent: (cpu_percent * 100.0).round() / 100.0,
+        cpu_percent: (cpu_percent as f64 * 100.0).round() / 100.0,
         memory_used_bytes: mem_used,
         memory_total_bytes: mem_total,
         memory_percent: (mem_percent * 100.0).round() / 100.0,
@@ -91,7 +89,7 @@ pub fn get_system_stats() -> SystemStats {
         disk_used_bytes: disk_used,
         disk_total_bytes: disk_total,
         disk_percent: (disk_percent * 100.0).round() / 100.0,
-        uptime_seconds: sys.uptime(),
-        boot_time_seconds: sys.boot_time(),
+        uptime_seconds: System::uptime(),
+        boot_time_seconds: System::boot_time(),
     }
 }
