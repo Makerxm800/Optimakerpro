@@ -27,31 +27,31 @@ pub struct StartupToggleResult {
 mod imp {
     use super::*;
     use std::collections::BTreeMap;
-    use winreg::{HKEY_CURRENT_USER, HKEY_LOCAL_MACHINE, RegKey, RegOptions};
+    use winreg::enums::{HKEY_CURRENT_USER, HKEY_LOCAL_MACHINE, KEY_ALL_ACCESS, KEY_READ};
+    use winreg::RegKey;
 
     const RUN_PATH: &str = r"Software\Microsoft\Windows\CurrentVersion\Run";
     const RUN_ONCE_PATH: &str = r"Software\Microsoft\Windows\CurrentVersion\RunOnce";
 
-    fn open(hk: &winreg::HKEY, path: &str, access: RegOptions) -> Option<RegKey> {
-        RegKey::open_with(hk, path, access).ok()
-    }
-
-    fn read_keys(hk: winreg::HKEY, hklm: winreg::HKEY) -> Vec<StartupApp> {
+    fn read_keys(hk: RegKey, hklm: RegKey) -> Vec<StartupApp> {
         let mut apps = BTreeMap::new();
 
-        for (root, label) in [(hk, "HKCU"), (hklm, "HKLM")] {
+        for (hive, label) in [(hk, "HKCU"), (hklm, "HKLM")] {
             for (sub_path, enabled) in [
                 (RUN_PATH, true),
                 (RUN_ONCE_PATH, false),
             ] {
-                let Some(key) = open(&root, sub_path, RegOptions::KEY_READ) else {
+                let Ok(key) = hive.open_subkey_with_flags(sub_path, KEY_READ) else {
                     continue;
                 };
-                for i in 0..u32::MAX {
-                    match key.enum_value(i) {
+                for entry in key.enum_values() {
+                    match entry {
                         Ok((name, value)) => {
-                            let value = value.to_string_lossy().to_string();
-                            let source = format!("{label}\\{}", &sub_path[sub_path.rfind('\\').map(|p| p + 1).unwrap_or(0)..]);
+                            let value = value.to_string();
+                            let source = format!(
+                                "{label}\\{}",
+                                &sub_path[sub_path.rfind('\\').map(|p| p + 1).unwrap_or(0)..]
+                            );
                             apps.entry(format!("{source}\\{name}")).or_insert_with(|| {
                                 StartupApp {
                                     name: name.clone(),
@@ -71,13 +71,16 @@ mod imp {
     }
 
     pub fn list() -> Vec<StartupApp> {
-        read_keys(HKEY_CURRENT_USER, HKEY_LOCAL_MACHINE)
+        read_keys(RegKey::predef(HKEY_CURRENT_USER), RegKey::predef(HKEY_LOCAL_MACHINE))
     }
 
     pub fn set_enabled(name: &str, path: &str, enabled: bool) -> StartupToggleResult {
         // HKCU Run is preferred for writes; HKLM Run is checked for removals.
-        for (hk, label) in [(HKEY_CURRENT_USER, "HKCU"), (HKEY_LOCAL_MACHINE, "HKLM")] {
-            let Some(key) = open(&hk, RUN_PATH, RegOptions::KEY_ALL_ACCESS) else {
+        for (hive, label) in [
+            (RegKey::predef(HKEY_CURRENT_USER), "HKCU"),
+            (RegKey::predef(HKEY_LOCAL_MACHINE), "HKLM"),
+        ] {
+            let Ok(key) = hive.open_subkey_with_flags(RUN_PATH, KEY_ALL_ACCESS) else {
                 continue;
             };
 
@@ -90,7 +93,7 @@ mod imp {
                         message: format!("{label} startup entry enabled."),
                     };
                 }
-            } else if key.remove_value(name).is_ok() {
+            } else if key.delete_value(name).is_ok() {
                 return StartupToggleResult {
                     name: name.to_string(),
                     enabled: false,

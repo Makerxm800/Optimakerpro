@@ -1,6 +1,7 @@
 //! Real system telemetry via the `sysinfo` crate (cross-platform).
 
 use serde::Serialize;
+use std::path::Path;
 use sysinfo::{Disks, System};
 
 #[derive(Debug, Serialize)]
@@ -27,11 +28,13 @@ pub fn get_system_stats() -> SystemStats {
     let mut sys = System::new();
     sys.refresh_all();
 
-    let cpu_percent = sys
-        .global_cpu_info()
-        .as_ref()
-        .map(|c| c.usage())
-        .unwrap_or(0.0);
+    // Average CPU usage across all cores.
+    let cpus = sys.cpus();
+    let cpu_percent = if cpus.is_empty() {
+        0.0
+    } else {
+        cpus.iter().map(|c| c.cpu_usage()).sum::<f32>() / cpus.len() as f32
+    };
 
     let mem_total = sys.total_memory();
     let mem_used = sys.used_memory();
@@ -48,14 +51,16 @@ pub fn get_system_stats() -> SystemStats {
     // non-removable disk on Windows.
     let disks = Disks::new_with_refreshed_list();
     let disk = disks
+        .list()
         .iter()
-        .find(|d| d.mount_point() == "/")
+        .find(|d| d.mount_point() == Path::new("/"))
         .or_else(|| {
             disks
+                .list()
                 .iter()
                 .find(|d| !d.name().to_string_lossy().contains("Removable"))
         })
-        .or_else(|| disks.iter().next());
+        .or_else(|| disks.list().iter().next());
 
     let (disk_used, disk_total) = match disk {
         Some(d) => (d.used_space(), d.total_space()),
@@ -67,15 +72,14 @@ pub fn get_system_stats() -> SystemStats {
         0.0
     };
 
-    let cpu_model = sys
-        .cpus()
+    let cpu_model = cpus
         .first()
         .map(|c| c.brand().to_string())
         .unwrap_or_else(|| "Unknown CPU".to_string());
 
     SystemStats {
-        os: sys.os_name().unwrap_or("Unknown").to_string(),
-        os_version: sys.os_version().unwrap_or("").to_string(),
+        os: System::name().unwrap_or_else(|| "Unknown".to_string()),
+        os_version: System::os_version().unwrap_or_else(|| "—".to_string()),
         architecture: std::env::consts::ARCH.to_string(),
         cpu_model,
         cpu_percent: (cpu_percent * 100.0).round() / 100.0,

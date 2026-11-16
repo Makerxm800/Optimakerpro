@@ -75,18 +75,17 @@ pub fn set_schedule(enabled: bool, frequency: String) -> ScheduleResult {
                 "weekly" => "WEEKLY",
                 _ => "DAILY",
             };
-            let status = Command::new("schtasks")
-                .args([
-                    "/create",
-                    "/tn",
-                    "TaurieV2Optimizer",
-                    "/tr",
-                    &exe,
-                    "/sc",
-                    freq,
-                    "/f",
-                ])
-                .status();
+            let args: Vec<String> = vec![
+                "/create".into(),
+                "/tn".into(),
+                "TaurieV2Optimizer".into(),
+                "/tr".into(),
+                format!("\"{exe}\""),
+                "/sc".into(),
+                freq.into(),
+                "/f".into(),
+            ];
+            let status = Command::new("schtasks").args(&args).status();
             match status {
                 Ok(s) if s.success() => {
                     return ScheduleResult {
