@@ -1,0 +1,98 @@
+name: CI
+
+# Validates the frontend (typecheck + production build) and type-checks the
+# Rust backend on every push and pull request.
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+
+permissions:
+  contents: write
+
+jobs:
+  frontend:
+    name: Frontend build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Typecheck & build
+        run: npm run build
+
+  rust-check:
+    name: Rust check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install system libraries
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libgtk-3-dev \
+            libayatana-appindicator3-dev librsvg2-dev build-essential \
+            curl wget file libssl-dev
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Check Rust backend
+        run: |
+          set -o pipefail
+          cargo check --manifest-path src-tauri/Cargo.toml 2>&1 | tee /tmp/cargo-check.log
+
+      - name: Comment Rust errors on PR
+        if: failure() && github.event_name == 'pull_request'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          {
+            echo '**Rust check failed** - last 80 lines of cargo check:'
+            echo '```'
+            tail -80 /tmp/cargo-check.log
+            echo '```'
+          } > /tmp/cargo-comment.md
+          BODY=$(python3 -c "import json; print(json.dumps({'body': open('/tmp/cargo-comment.md').read()}))")
+          curl -sS -X POST \
+            -H "Authorization: Bearer $GITHUB_TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            "https://api.github.com/repos/${{ github.repository }}/issues/${{ github.event.pull_request.number }}/comments" \
+            -d "$BODY"
+
+      - name: Push cargo log to diagnostics branch
+        if: failure() && github.event_name == 'pull_request'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          cp /tmp/cargo-check.log cargo-check-diagnostics.txt
+          git config user.email "ci@optimakerpro.dev"
+          git config user.name "Taurie CI"
+          git add cargo-check-diagnostics.txt
+          git commit -q -m "ci: capture cargo check diagnostics"
+          git push "https://x-access-token:${GITHUB_TOKEN}@github.com/${{ github.repository }}.git" \
+            HEAD:refs/heads/ci-cargo-diagnostics
+
+      - name: Upload cargo check log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cargo-check-log
+          path: /tmp/cargo-check.log
+          if-no-files-found: ignore
