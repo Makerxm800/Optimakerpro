@@ -318,16 +318,18 @@ fn compute_mask_impl(_tweaks: &GameTweaks) -> Result<usize, String> {
 }
 
 pub fn apply_affinity_pid(pid: u32, tweaks: &GameTweaks) -> Result<(), String> {
-    #[cfg(windows)]
-    {
-        let mask = compute_mask(tweaks)?;
-        topology::set_affinity(pid, mask)
-    }
-    #[cfg(not(windows))]
-    {
-        let _ = (pid, tweaks);
-        Err("Game tweaks are Windows-only".to_string())
-    }
+    apply_affinity_pid_impl(pid, tweaks)
+}
+
+#[cfg(windows)]
+fn apply_affinity_pid_impl(pid: u32, tweaks: &GameTweaks) -> Result<(), String> {
+    let mask = compute_mask(tweaks)?;
+    topology::set_affinity(pid, mask)
+}
+
+#[cfg(not(windows))]
+fn apply_affinity_pid_impl(_pid: u32, _tweaks: &GameTweaks) -> Result<(), String> {
+    Err("Game tweaks are Windows-only".to_string())
 }
 
 // ============================================================
