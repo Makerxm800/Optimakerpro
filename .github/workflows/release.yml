@@ -51,12 +51,6 @@ jobs:
           key: taurie-${{ runner.os }}-${{ hashFiles('src-tauri/Cargo.toml') }}
           restore-keys: taurie-${{ runner.os }}-
 
-      - name: Install Windows build tools
-        if: runner.os == 'Windows'
-        shell: pwsh
-        run: |
-          choco install microsoft-visual-cpp-build-tools -y --no-progress --accept-license --disable-progress-bar | Out-Null
-
       - name: Build & release with Tauri
         uses: tauri-apps/tauri-action@v0
         env:
