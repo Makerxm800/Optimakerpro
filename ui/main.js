@@ -21,7 +21,14 @@ const state = {
   update: { available: false, version: null, checking: false },
   activity: [],
   history: loadJSON("opm-history", { cleans: [], boosts: [] }),
-  procTimer: null,
+  // Game mode
+  games: [],
+  catalog: [],
+  tweakStates: {}, // id -> { active, error }
+  topology: null,
+  mode: "balanced",
+  gameCat: "all",
+  runningGame: null,
 };
 
 /* ============================================================
@@ -79,6 +86,12 @@ function esc(str) {
 
 function sleep(ms) {
   return new Promise((r) => setTimeout(r, ms));
+}
+
+function hueFromString(str) {
+  let h = 0;
+  for (let i = 0; i < str.length; i++) h = (h * 31 + str.charCodeAt(i)) % 360;
+  return h;
 }
 
 function animateBar(barEl, to, duration = 600) {
@@ -139,11 +152,37 @@ function toast(title, { body = "", kind = "", actions = [], sticky = false } = {
 }
 
 /* ============================================================
+   Modal
+   ============================================================ */
+
+function openModal(html) {
+  const overlay = $("#modalOverlay");
+  const box = $("#modalBox");
+  box.innerHTML = `<button class="modal-close" aria-label="Close">✕</button>${html}`;
+  overlay.classList.remove("hidden");
+  box.querySelector(".modal-close").addEventListener("click", closeModal);
+  overlay.onclick = (e) => {
+    if (e.target === overlay) closeModal();
+  };
+  document.addEventListener("keydown", escClose);
+  return box;
+}
+
+function closeModal() {
+  $("#modalOverlay").classList.add("hidden");
+  $("#modalBox").innerHTML = "";
+  document.removeEventListener("keydown", escClose);
+}
+
+function escClose(e) {
+  if (e.key === "Escape") closeModal();
+}
+
+/* ============================================================
    Demo mode (when opened in a plain browser, outside Tauri)
    ============================================================ */
 
 const demoSettings = {
-  realTimeProtection: true,
   autoMemoryBoost: true,
   autoCleanup: true,
   silentMode: false,
@@ -151,6 +190,53 @@ const demoSettings = {
   launchOnStartup: false,
   reduceAnimations: false,
 };
+
+const demoCatalog = [
+  { id: "windows_game_mode", category: "fps", title: "Windows Game Mode", description: "Lets Windows prioritise the game you're playing and pause background work.", badge: "safe", needs_admin: false, needs_restart: false, keys: ["HKCU\\Software\\Microsoft\\GameBar"], detail: "Sets AutoGameModeEnabled=1 and AllowAutoGameMode=1 so the foreground game gets CPU and memory priority." },
+  { id: "game_dvr_off", category: "fps", title: "Disable Game DVR recording", description: "Stops Windows from silently recording gameplay in the background.", badge: "safe", needs_admin: false, needs_restart: false, keys: ["HKCU\\System\\GameConfigStore", "HKCU\\...\\GameDVR"], detail: "The background clip recorder (Win+G) stops consuming GPU time." },
+  { id: "power_plan_high", category: "fps", title: "High performance power plan", description: "Switches Windows to the High Performance plan so the CPU doesn't idle down mid-game.", badge: "safe", needs_admin: false, needs_restart: false, keys: ["powercfg /getactivescheme"], detail: "Applies instantly — no restart needed. Deactivating switches back to Balanced." },
+  { id: "mouse_precision_off", category: "fps", title: "Disable mouse acceleration", description: "Turns off 'Enhance pointer precision' for 1:1 mouse movements — essential for aim.", badge: "safe", needs_admin: false, needs_restart: true, keys: ["HKCU\\Control Panel\\Mouse"], detail: "Applies at your next sign-in." },
+  { id: "gpu_scheduling", category: "fps", title: "Hardware-accelerated GPU scheduling", description: "Hands GPU scheduling to a dedicated processor for lower latency (restart required).", badge: "advanced", needs_admin: true, needs_restart: true, keys: ["HKLM\\SYSTEM\\CurrentControlSet\\Control\\GraphicsDrivers"], detail: "Needs administrator approval (UAC) and a full restart." },
+  { id: "network_throttling", category: "network", title: "Disable network throttling", description: "Stops Windows from capping network traffic while multimedia plays.", badge: "advanced", needs_admin: true, needs_restart: true, keys: ["HKLM\\...\\Multimedia\\SystemProfile"], detail: "Removes the 10 packets/ms cap Windows applies while media plays." },
+  { id: "system_responsiveness", category: "network", title: "System responsiveness for games", description: "Reserves fewer CPU cycles for background tasks (20% → 10%).", badge: "advanced", needs_admin: true, needs_restart: true, keys: ["HKLM\\...\\Multimedia\\SystemProfile"], detail: "Gives games more CPU headroom." },
+  { id: "games_priority", category: "network", title: "Games task priority", description: "Raises CPU/GPU priority and I/O bandwidth for the 'Games' scheduling class.", badge: "advanced", needs_admin: true, needs_restart: true, keys: ["HKLM\\...\\SystemProfile\\Tasks\\Games"], detail: "Priority=6, Scheduling Category=High, SFIO Priority=High." },
+  { id: "nagle_off", category: "network", title: "Disable Nagle's algorithm", description: "Sends small packets immediately instead of batching — can shave ping in some games.", badge: "advanced", needs_admin: true, needs_restart: true, keys: ["HKLM\\SYSTEM\\...\\Tcpip\\Parameters\\Interfaces"], detail: "Effect varies by game; most noticeable in older titles." },
+  { id: "animations_off", category: "qol", title: "Reduce window animations", description: "Disables minimise/restore animations and shortens menu delays.", badge: "safe", needs_admin: false, needs_restart: true, keys: ["HKCU\\Control Panel\\Desktop\\WindowMetrics"], detail: "Makes the desktop feel snappier." },
+  { id: "startup_delay_off", category: "qol", title: "Remove startup app delay", description: "Removes Windows' staged delay when launching startup apps after sign-in.", badge: "safe", needs_admin: false, needs_restart: false, keys: ["HKCU\\...\\Explorer\\Serialize"], detail: "Your startup apps launch immediately." },
+  { id: "background_apps_off", category: "qol", title: "Disable background apps", description: "Stops store apps from running in the background when you're not using them.", badge: "safe", needs_admin: false, needs_restart: true, keys: ["HKCU\\...\\BackgroundAccessApplications"], detail: "More CPU and RAM headroom for games." },
+  { id: "advertising_id_off", category: "privacy", title: "Disable advertising ID", description: "Stops Windows from generating an ad-tracking ID for apps.", badge: "safe", needs_admin: false, needs_restart: false, keys: ["HKCU\\...\\AdvertisingInfo"], detail: "No performance impact — just less tracking." },
+  { id: "input_personalization_off", category: "privacy", title: "Disable typing personalisation", description: "Stops Windows collecting your typing and inking history in the background.", badge: "safe", needs_admin: false, needs_restart: false, keys: ["HKCU\\InputPersonalization"], detail: "Slightly less background chatter." },
+  { id: "tailored_experiences_off", category: "privacy", title: "Disable tailored experiences", description: "Stops Windows using diagnostic data to personalise tips and ads.", badge: "safe", needs_admin: false, needs_restart: false, keys: ["HKCU\\...\\Privacy"], detail: "Instant, no restart." },
+  { id: "diagnostic_data_off", category: "privacy", title: "Diagnostic data to minimum", description: "Sets the diagnostic data policy to the lowest level Windows allows.", badge: "advanced", needs_admin: true, needs_restart: false, keys: ["HKLM\\SOFTWARE\\Policies\\Microsoft\\Windows\\DataCollection"], detail: "Needs administrator approval (UAC)." },
+];
+
+let demoGames = [
+  { id: "steam-1", name: "Cyberpunk 2077", exe_name: "Cyberpunk2077.exe", source: "Steam", running: true, tweaks: { disable_cpu0: false, disable_ecores: false, disable_smt: false, fso_off: true } },
+  { id: "steam-2", name: "Rocket League", exe_name: "RocketLeague.exe", source: "Steam", running: false, tweaks: { disable_cpu0: true, disable_ecores: false, disable_smt: false, fso_off: false } },
+  { id: "epic-1", name: "Fortnite", exe_name: "FortniteClient-Win64-Shipping.exe", source: "Epic", running: false, tweaks: { disable_cpu0: false, disable_ecores: true, disable_smt: false, fso_off: false } },
+  { id: "riot-1", name: "VALORANT", exe_name: "VALORANT-Win64-Shipping.exe", source: "Riot", running: false, tweaks: { disable_cpu0: false, disable_ecores: false, disable_smt: false, fso_off: true } },
+];
+
+let demoTweakStates = {
+  windows_game_mode: true,
+  game_dvr_off: true,
+  power_plan_high: false,
+  mouse_precision_off: false,
+  gpu_scheduling: false,
+  network_throttling: false,
+  system_responsiveness: false,
+  games_priority: false,
+  nagle_off: false,
+  animations_off: false,
+  startup_delay_off: true,
+  background_apps_off: false,
+  advertising_id_off: true,
+  input_personalization_off: false,
+  tailored_experiences_off: false,
+  diagnostic_data_off: false,
+};
+
+const demoAddPool = ["Elden Ring", "Hades II", "Baldur's Gate 3", "Apex Legends"];
 
 async function demoInvoke(cmd, args = {}) {
   await sleep(180 + Math.random() * 350);
@@ -177,6 +263,7 @@ async function demoInvoke(cmd, args = {}) {
       };
     case "top_processes":
       return [
+        { name: "Cyberpunk2077.exe", memory_bytes: 3_140_000_000 },
         { name: "chrome.exe", memory_bytes: 2_140_000_000 },
         { name: "msedge.exe", memory_bytes: 1_510_000_000 },
         { name: "code.exe", memory_bytes: 980_000_000 },
@@ -184,7 +271,6 @@ async function demoInvoke(cmd, args = {}) {
         { name: "explorer.exe", memory_bytes: 310_000_000 },
         { name: "steam.exe", memory_bytes: 290_000_000 },
         { name: "spotify.exe", memory_bytes: 180_000_000 },
-        { name: "notepad.exe", memory_bytes: 20_000_000 },
       ];
     case "scan_junk":
       return [
@@ -212,12 +298,66 @@ async function demoInvoke(cmd, args = {}) {
       ];
     case "remove_startup_item":
       return null;
-    case "list_quarantine":
-      return [];
     case "check_for_updates":
       return { current_version: "1.0.0", available: false, version: null, notes: null, download_size: 0, message: "You're on the latest version. (preview data)" };
-    case "reveal_quarantine":
+    case "get_tweak_catalog":
+      return demoCatalog;
+    case "get_tweak_states":
+      return demoCatalog.map((d) => ({ id: d.id, active: !!demoTweakStates[d.id], error: null }));
+    case "set_tweaks": {
+      const ids = args.ids || [];
+      const enabled = !!args.enabled;
+      for (const id of ids) demoTweakStates[id] = enabled;
+      const def = demoCatalog.find((d) => ids.includes(d.id));
+      if (enabled && def && def.needs_restart) {
+        toast("Restart required", { kind: "good", body: `${def.title} applied — restart your PC to fully apply it.` });
+      } else if (enabled && def) {
+        toast(def.needs_admin ? "Applied with admin approval" : "Applied", { kind: "good", body: def.title });
+      } else if (def) {
+        toast("Reverted", { body: def.title });
+      }
+      return demoCatalog.map((d) => ({ id: d.id, active: !!demoTweakStates[d.id], error: null }));
+    }
+    case "set_game_mode": {
+      const presets = {
+        balanced: ["windows_game_mode", "game_dvr_off"],
+        performance: ["windows_game_mode", "game_dvr_off", "power_plan_high", "startup_delay_off", "background_apps_off"],
+        custom: [],
+      };
+      const ids = presets[args.mode] || [];
+      for (const [id, on] of Object.entries(demoTweakStates)) {
+        const def = demoCatalog.find((d) => d.id === id);
+        if (def && !def.needs_admin) demoTweakStates[id] = ids.includes(id);
+      }
+      if (ids.length) {
+        toast(`${args.mode[0].toUpperCase() + args.mode.slice(1)} mode applied`, {
+          kind: "good",
+          body: `${ids.length} optimizations activated.`,
+        });
+      }
+      return demoCatalog.map((d) => ({ id: d.id, active: !!demoTweakStates[d.id], error: null }));
+    }
+    case "get_core_topology":
+      return { cores: 8, logical: 16, e_cores: 0, smt: true };
+    case "list_games":
+      return demoGames;
+    case "add_game_from_path": {
+      const name = demoAddPool.pop() || "New Game";
+      const g = { id: `manual-${Date.now()}`, name, exe_name: `${name.replace(/[^a-z]/gi, "")}.exe`, source: "Manual", running: false, tweaks: { disable_cpu0: false, disable_ecores: false, disable_smt: false, fso_off: false } };
+      demoGames.push(g);
+      return g;
+    }
+    case "remove_game": {
+      demoGames = demoGames.filter((g) => g.id !== args.id);
       return null;
+    }
+    case "set_game_tweak": {
+      const g = demoGames.find((x) => x.id === args.gameId);
+      if (g && g.tweaks[args.tweak] !== undefined) g.tweaks[args.tweak] = !!args.enabled;
+      return g ? g.tweaks : null;
+    }
+    case "boost_game":
+      return "Game pinned to the selected cores (preview data)";
     default:
       return null;
   }
@@ -231,7 +371,7 @@ const PAGE_TITLES = {
   dashboard: "Dashboard",
   cleanup: "Cleanup",
   performance: "Performance",
-  protection: "Protection",
+  game: "Game Mode",
   settings: "Settings",
 };
 
@@ -241,7 +381,7 @@ function setPage(page) {
   $$(".page").forEach((p) => p.classList.toggle("active", p.id === `page-${page}`));
   $("#pageTitle").textContent = PAGE_TITLES[page] || "Optimakerpro";
   if (page === "performance") refreshPerformancePage();
-  if (page === "protection") refreshQuarantine();
+  if (page === "game") refreshGameData();
 }
 
 /* ============================================================
@@ -283,7 +423,6 @@ async function toggleSetting(key) {
   syncSettingUI();
   await persistSettings();
   const names = {
-    realTimeProtection: "Real-Time Protection",
     autoMemoryBoost: "Auto Memory Boost",
     autoCleanup: "Auto Cleanup",
     silentMode: "Silent / Game Mode",
@@ -393,7 +532,7 @@ function renderActivity() {
   items.sort((a, b) => b.at - a.at);
   const top = items.slice(0, 8);
   if (!top.length) {
-    list.innerHTML = `<li class="activity-empty">Nothing yet — cleanups, boosts and alerts will show up here.</li>`;
+    list.innerHTML = `<li class="activity-empty">Nothing yet — cleanups, boosts and game sessions will show up here.</li>`;
     return;
   }
   list.innerHTML = top
@@ -556,7 +695,6 @@ async function cleanSelected() {
     }.`;
     summary.classList.remove("hidden");
     toast(`Freed ${fmtBytes(res.freed_bytes)}`, { kind: "good", body: `${res.removed_files} files removed.` });
-    // Re-scan quietly so the list shows what's left.
     setTimeout(() => scanJunk(), 1200);
   } catch (e) {
     toast("Cleanup failed", { body: String(e), kind: "err" });
@@ -674,80 +812,389 @@ async function boostMemory() {
 }
 
 /* ============================================================
-   Protection page
+   Game Mode
    ============================================================ */
 
-async function refreshQuarantine() {
-  let items = [];
+async function refreshGameData() {
   try {
-    items = await invoke("list_quarantine");
-  } catch {
-    /* ignore */
+    const [games, catalog, states, topology] = await Promise.all([
+      invoke("list_games"),
+      invoke("get_tweak_catalog"),
+      invoke("get_tweak_states"),
+      invoke("get_core_topology"),
+    ]);
+    state.games = games;
+    state.catalog = catalog;
+    state.tweakStates = Object.fromEntries(states.map((s) => [s.id, s]));
+    state.topology = topology;
+    renderGames();
+    renderTweaks();
+    updateGameBanner();
+  } catch (e) {
+    toast("Couldn't load Game Mode data", { body: String(e), kind: "err" });
   }
-  const list = $("#quarList");
+}
+
+function categoryLabel(cat) {
+  return {
+    fps: "FPS & Latency",
+    network: "Network & Ping",
+    qol: "Quality of Life",
+    privacy: "Privacy & Security",
+  }[cat] || cat;
+}
+
+function renderGames() {
+  const row = $("#gamesRow");
+  const cards = state.games
+    .map((g) => {
+      const hue = hueFromString(g.name);
+      return `
+      <div class="card game-card ${g.running ? "running" : ""}" data-id="${esc(g.id)}">
+        <div class="game-avatar" style="--h:${hue}">${esc(g.name.charAt(0).toUpperCase())}</div>
+        <div class="game-meta">
+          <strong title="${esc(g.name)}">${esc(g.name)}</strong>
+          <span class="game-src">${esc(g.source)}${g.running ? ' <span class="running-dot"></span>' : ""}</span>
+        </div>
+        <div class="game-card-actions">
+          <button class="btn btn-sm" data-tweaks="${esc(g.id)}">Tweaks</button>
+          <button class="icon-btn-x" data-remove="${esc(g.id)}" title="Remove from list">✕</button>
+        </div>
+      </div>`;
+    })
+    .join("");
+  row.innerHTML =
+    cards +
+    `<button class="card add-game-card" id="addGameCard"><span class="plus">+</span>Add game</button>`;
+  row.querySelectorAll("[data-tweaks]").forEach((btn) => {
+    btn.addEventListener("click", () => openGameTweaks(btn.dataset.tweaks));
+  });
+  row.querySelectorAll("[data-remove]").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      const id = btn.dataset.remove;
+      const game = state.games.find((g) => g.id === id);
+      if (!confirm(`Remove "${game ? game.name : "this game"}" from My Games?`)) return;
+      try {
+        await invoke("remove_game", { id });
+        await refreshGameData();
+        toast("Removed from My Games", { kind: "good" });
+      } catch (e) {
+        toast("Couldn't remove", { body: String(e), kind: "err" });
+      }
+    });
+  });
+  $("#addGameCard").addEventListener("click", addGame);
+}
+
+async function addGame() {
+  if (isTauri && T.dialog && T.dialog.open) {
+    try {
+      const path = await T.dialog.open({
+        multiple: false,
+        title: "Pick the game's .exe file",
+        filters: [{ name: "Game executable", extensions: ["exe"] }],
+      });
+      if (!path) return;
+      await invoke("add_game_from_path", { path });
+      await refreshGameData();
+      toast("Game added", { kind: "good" });
+    } catch (e) {
+      toast("Couldn't add game", { body: String(e), kind: "err" });
+    }
+  } else {
+    await invoke("add_game_from_path", { path: "demo" });
+    await refreshGameData();
+    toast("Game added (preview data)", { kind: "good" });
+  }
+}
+
+function renderTweaks() {
+  const grid = $("#tweaksGrid");
+  const items = state.catalog.filter((d) => state.gameCat === "all" || d.category === state.gameCat);
   if (!items.length) {
-    list.innerHTML = `<li class="list-empty">Quarantine is empty.</li>`;
+    grid.innerHTML = `<div class="card tweak-card"><p class="muted">No optimizations in this category.</p></div>`;
     return;
   }
-  list.innerHTML = items
-    .map(
-      (q) => `
-    <li data-id="${esc(q.id)}">
-      <span class="act-icon warn"><svg viewBox="0 0 24 24"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/></svg></span>
-      <div class="quar-info"><strong>${esc(q.name)}</strong><span>${esc(q.original_path)} · ${esc(fmtBytes(q.size_bytes))} · ${esc(timeAgo(q.quarantined_at * 1000))}</span></div>
-      <div class="quar-actions">
-        <button class="btn btn-sm" data-act="restore">Restore</button>
-        <button class="btn btn-sm btn-ghost-danger" data-act="delete">Delete</button>
-      </div>
-    </li>`
-    )
+  grid.innerHTML = items
+    .map((d) => {
+      const st = state.tweakStates[d.id] || { active: false };
+      const chips = [
+        `<span class="chip-cat">${esc(categoryLabel(d.category))}</span>`,
+        `<span class="badge ${d.badge}">${d.badge === "safe" ? "Safe" : "Advanced"}</span>`,
+        d.needs_admin ? `<span class="badge admin">Admin</span>` : "",
+        st.active && d.needs_restart ? `<span class="badge restart">Restart needed</span>` : "",
+      ].join("");
+      return `
+      <div class="card tweak-card ${st.active ? "active" : ""}">
+        <div class="tweak-chips">${chips}</div>
+        <strong class="tweak-title">${esc(d.title)}</strong>
+        <p class="tweak-desc">${esc(d.description)}</p>
+        <div class="tweak-foot">
+          <button class="icon-info" data-info="${esc(d.id)}" title="What this changes" aria-label="Details about ${esc(d.title)}">i</button>
+          <span class="activate-label ${st.active ? "on" : ""}" data-activate="${esc(d.id)}">
+            <span>${st.active ? "Active" : "Activate"}</span>
+            <button class="switch" data-tweak="${esc(d.id)}" aria-checked="${st.active}" aria-label="Toggle ${esc(d.title)}"><span class="knob"></span></button>
+          </span>
+        </div>
+      </div>`;
+    })
     .join("");
-  list.querySelectorAll("li[data-id]").forEach((li) => {
-    const id = li.dataset.id;
-    li.querySelector('[data-act="restore"]').addEventListener("click", async () => {
-      try {
-        await invoke("restore_quarantined", { id });
-        toast("Restored", { kind: "good" });
-        refreshQuarantine();
-      } catch (e) {
-        toast("Restore failed", { body: String(e), kind: "err" });
-      }
-    });
-    li.querySelector('[data-act="delete"]').addEventListener("click", async () => {
-      try {
-        await invoke("delete_quarantined", { id });
-        toast("Deleted permanently", { kind: "good" });
-        refreshQuarantine();
-      } catch (e) {
-        toast("Delete failed", { body: String(e), kind: "err" });
-      }
-    });
+
+  grid.querySelectorAll("[data-tweak]").forEach((sw) => {
+    sw.addEventListener("click", () => toggleTweak(sw.dataset.tweak));
+  });
+  grid.querySelectorAll("[data-info]").forEach((btn) => {
+    btn.addEventListener("click", () => showTweakInfo(btn.dataset.info));
   });
 }
 
-function onThreatFound(payload) {
-  pushActivity({ icon: "warn", title: `Suspicious file: ${payload.name}`, sub: timeAgo(Date.now()) });
-  toast("Suspicious file detected", {
-    kind: "warn",
-    sticky: true,
-    body: `${payload.name} (${fmtBytes(payload.sizeBytes)}) just appeared in a temp folder.`,
-    actions: [
-      {
-        label: "Quarantine",
-        primary: true,
-        cb: async () => {
-          try {
-            await invoke("quarantine_file", { path: payload.path });
-            toast("Moved to quarantine", { kind: "good", body: payload.name });
-            if (state.page === "protection") refreshQuarantine();
-          } catch (e) {
-            toast("Couldn't quarantine", { body: String(e), kind: "err" });
-          }
-        },
-      },
-      { label: "Ignore", cb: () => {} },
-    ],
+async function toggleTweak(id) {
+  const def = state.catalog.find((d) => d.id === id);
+  if (!def) return;
+  const current = state.tweakStates[id]?.active || false;
+  const enabling = !current;
+
+  if (enabling && def.needs_admin) {
+    toast("Windows will ask for permission", {
+      kind: "",
+      body: "Click Yes on the UAC prompt to apply this optimization.",
+    });
+  }
+
+  const switchEl = $(`[data-tweak="${CSS.escape(id)}"]`);
+  if (switchEl) switchEl.classList.add("tweak-switch-busy");
+  try {
+    const states = await invoke("set_tweaks", { ids: [id], enabled: enabling });
+    states.forEach((s) => {
+      state.tweakStates[s.id] = s;
+      if (s.error) {
+        toast("Not applied", { kind: "err", body: `${def.title}: ${s.error}` });
+      } else if (enabling && def.needs_restart) {
+        toast("Restart your PC to fully apply it", {
+          kind: "good",
+          body: `${def.title} is active now — restart when convenient.`,
+        });
+      } else if (enabling) {
+        toast(`${def.title} applied`, { kind: "good", body: def.needs_admin ? "With admin approval — changes verified." : "Change verified on your system." });
+      } else {
+        toast("Reverted", { body: `${def.title} is back to Windows defaults.` });
+      }
+    });
+    renderTweaks();
+  } catch (e) {
+    toast("Couldn't apply", { body: String(e), kind: "err" });
+  } finally {
+    if (switchEl) switchEl.classList.remove("tweak-switch-busy");
+  }
+}
+
+function showTweakInfo(id) {
+  const def = state.catalog.find((d) => d.id === id);
+  if (!def) return;
+  const st = state.tweakStates[id] || { active: false };
+  openModal(`
+    <h2>${esc(def.title)}
+      <span class="badge ${def.badge}">${def.badge === "safe" ? "Safe" : "Advanced"}</span>
+      ${st.active ? `<span class="badge safe">Active</span>` : ""}
+    </h2>
+    <p class="modal-sub muted">${esc(def.description)}</p>
+    <p class="modal-detail">${esc(def.detail)}</p>
+    ${def.needs_restart ? `<p class="modal-detail"><strong>Restart:</strong> a PC restart is needed for this to fully apply.</p>` : ""}
+    ${def.needs_admin ? `<p class="modal-detail"><strong>Administrator:</strong> Windows will show a UAC prompt.</p>` : ""}
+    <div class="modal-keys">${def.keys.map((k) => esc(k)).join("<br>")}</div>
+    <div class="modal-actions">
+      <button class="btn" id="infoClose">Close</button>
+    </div>
+  `);
+  $("#infoClose").addEventListener("click", closeModal);
+}
+
+/* Game-specific tweaks modal */
+function openGameTweaks(gameId) {
+  const game = state.games.find((g) => g.id === gameId);
+  if (!game) return;
+  const topo = state.topology || { e_cores: 0, smt: false };
+  const t = game.tweaks || {};
+  const pending = { ...t };
+
+  const rows = [];
+  const rowTpl = (key, iconSvg, title, badge, desc, note) => `
+    <div class="gt-row">
+      <span class="gt-icon">${iconSvg}</span>
+      <div class="gt-body">
+        <div class="gt-title">${esc(title)} <span class="badge ${badge}">${badge === "safe" ? "Safe" : "Advanced"}</span></div>
+        <p>${esc(desc)}</p>
+        ${note ? `<div class="gt-note">${esc(note)}</div>` : ""}
+      </div>
+      <button class="switch" data-gt="${key}" aria-checked="${!!pending[key]}" aria-label="Toggle ${esc(title)}"><span class="knob"></span></button>
+    </div>`;
+
+  rows.push(
+    rowTpl(
+      "disable_cpu0",
+      `<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 2a10 10 0 0 1 10 10h-10z"/></svg>`,
+      "Disable CPU 0",
+      "safe",
+      "Keeps the game off Windows' busiest core so it runs smoother.",
+      ""
+    )
+  );
+
+  rows.push(
+    rowTpl(
+      "disable_ecores",
+      `<svg viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M4 12h16"/><path d="M12 4v16"/></svg>`,
+      "Disable E-Cores",
+      "safe",
+      "Runs the game only on your strongest performance cores for better consistency.",
+      topo.e_cores === 0 ? (state.topology ? "No efficiency cores detected on this CPU." : "") : ""
+    )
+  );
+
+  rows.push(
+    rowTpl(
+      "disable_smt",
+      `<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 8v8"/><path d="M8 12h8"/></svg>`,
+      "Disable SMT/Hyperthreading",
+      "advanced",
+      "Restricts the game to physical cores only for more predictable frame times.",
+      topo.smt ? "" : "Hyperthreading not detected — nothing to disable."
+    )
+  );
+
+  rows.push(
+    rowTpl(
+      "fso_off",
+      `<svg viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8"/><path d="M12 17v4"/></svg>`,
+      "Disable Fullscreen Optimizations",
+      "safe",
+      "Skips Windows' borderless-fullscreen wrapper for lower input latency.",
+      "Applies the next time the game launches."
+    )
+  );
+
+  const box = openModal(`
+    <h2>${esc(game.name)} tweaks</h2>
+    <p class="modal-sub muted">
+      Core topology: ${topo.cores || "?"} cores · ${topo.logical || "?"} threads
+      ${topo.e_cores ? ` · ${topo.e_cores} E-cores` : ""}
+    </p>
+    ${rows.join("")}
+    <div class="modal-actions">
+      <button class="btn" id="gtCancel">Cancel</button>
+      <button class="btn btn-primary" id="gtActivate">Activate</button>
+    </div>
+  `);
+
+  box.querySelectorAll("[data-gt]").forEach((sw) => {
+    const key = sw.dataset.gt;
+    if (key === "disable_ecores" && topo.e_cores === 0 && state.topology) {
+      sw.disabled = true;
+      sw.style.opacity = "0.35";
+      sw.style.cursor = "not-allowed";
+    }
+    if (key === "disable_smt" && !topo.smt) {
+      sw.disabled = true;
+      sw.style.opacity = "0.35";
+      sw.style.cursor = "not-allowed";
+    }
+    sw.addEventListener("click", () => {
+      pending[key] = !pending[key];
+      sw.setAttribute("aria-checked", String(pending[key]));
+    });
   });
+
+  $("#gtCancel").addEventListener("click", closeModal);
+  $("#gtActivate").addEventListener("click", async () => {
+    const btn = $("#gtActivate");
+    btn.classList.add("busy");
+    try {
+      for (const [key, enabled] of Object.entries(pending)) {
+        if (t[key] === enabled) continue;
+        await invoke("set_game_tweak", { gameId: gameId, tweak: key, enabled: enabled });
+      }
+      closeModal();
+      await refreshGameData();
+      toast("Tweaks activated", {
+        kind: "good",
+        body: game.running
+          ? `${game.name} is running — affinity applied instantly.`
+          : `They'll apply automatically next time ${game.name} launches.`,
+      });
+    } catch (e) {
+      toast("Couldn't apply all tweaks", { body: String(e), kind: "err" });
+    } finally {
+      btn.classList.remove("busy");
+    }
+  });
+}
+
+function updateGameBanner() {
+  const pill = $("#gmPill");
+  const pillText = $("#gmPillText");
+  const statusText = $("#gmStatusText");
+  const boostBtn = $("#boostGameBtn");
+  const running = state.games.find((g) => g.running) || null;
+  state.runningGame = running;
+
+  if (running) {
+    pill.classList.add("on");
+    pillText.textContent = "GAME MODE ON";
+    statusText.textContent = `${running.name} is running — your tweaks are active.`;
+    boostBtn.classList.remove("hidden");
+  } else {
+    pill.classList.remove("on");
+    pillText.textContent = "NO GAME RUNNING";
+    statusText.textContent = "Detection is on — launch a game.";
+    boostBtn.classList.add("hidden");
+  }
+}
+
+async function switchMode(mode) {
+  const pills = $$("#modePills .mode-pill");
+  pills.forEach((p) => p.classList.toggle("active", p.dataset.mode === mode));
+  const pill = $(`.mode-pill[data-mode="${mode}"]`);
+  pill.classList.add("busy");
+  try {
+    const states = await invoke("set_game_mode", { mode: mode });
+    states.forEach((s) => {
+      state.tweakStates[s.id] = s;
+      if (s.error) {
+        toast("Not applied", { kind: "err", body: s.error });
+      }
+    });
+    state.mode = mode;
+    renderTweaks();
+    if (mode !== "custom") {
+      const activeCount = states.filter((s) => s.active).length;
+      toast(`${mode.charAt(0).toUpperCase() + mode.slice(1)} mode`, {
+        kind: "good",
+        body: `${activeCount} optimizations active. Advanced tweaks stay opt-in.`,
+      });
+    }
+  } catch (e) {
+    toast("Couldn't switch mode", { body: String(e), kind: "err" });
+    pills.forEach((p) => p.classList.toggle("active", p.dataset.mode === state.mode));
+  } finally {
+    pill.classList.remove("busy");
+  }
+}
+
+async function boostGameNow() {
+  const game = state.runningGame;
+  if (!game) return;
+  try {
+    const msg = await invoke("boost_game", { gameId: game.id });
+    toast("Game boosted", { kind: "good", body: msg });
+  } catch (e) {
+    // Fall back to a general memory trim.
+    try {
+      const res = await invoke("boost_memory");
+      toast(`Freed ${fmtBytes(res.freed_bytes)}`, { kind: "good", body: "No core tweaks for this game — trimmed memory instead." });
+    } catch (e2) {
+      toast("Boost failed", { body: String(e), kind: "err" });
+    }
+  }
 }
 
 /* ============================================================
@@ -834,7 +1281,7 @@ function wire() {
     btn.addEventListener("click", () => setPage(btn.dataset.page));
   });
 
-  // Toggles everywhere (dashboard tiles, protection hero, settings rows)
+  // Settings toggles
   $$(".switch[data-setting]").forEach((sw) => {
     sw.addEventListener("click", () => toggleSetting(sw.dataset.setting));
   });
@@ -849,6 +1296,7 @@ function wire() {
 
   // Dashboard
   $("#optimizeBtn").addEventListener("click", optimizeNow);
+  $("#gameTileBtn").addEventListener("click", () => setPage("game"));
 
   // Cleanup
   $("#scanBtn").addEventListener("click", scanJunk);
@@ -861,13 +1309,21 @@ function wire() {
   // Performance
   $("#boostBtn").addEventListener("click", boostMemory);
 
-  // Protection
-  $("#openQuarBtn").addEventListener("click", async () => {
-    try {
-      await invoke("reveal_quarantine");
-    } catch (e) {
-      toast("Couldn't open folder", { body: String(e), kind: "err" });
-    }
+  // Game Mode
+  $$("#modePills .mode-pill").forEach((pill) => {
+    pill.addEventListener("click", () => switchMode(pill.dataset.mode));
+  });
+  $("#editModeBtn").addEventListener("click", () => {
+    $("#tweaksGrid").scrollIntoView({ behavior: "smooth", block: "start" });
+  });
+  $("#addGameBtn").addEventListener("click", addGame);
+  $("#boostGameBtn").addEventListener("click", boostGameNow);
+  $$("#catTabs .cat-tab").forEach((tab) => {
+    tab.addEventListener("click", () => {
+      state.gameCat = tab.dataset.cat;
+      $$("#catTabs .cat-tab").forEach((t) => t.classList.toggle("active", t === tab));
+      renderTweaks();
+    });
   });
 
   // Settings
@@ -886,7 +1342,6 @@ function wire() {
       const row = $(`#cleanList .clean-row[data-id="${CSS.escape(id)}"]`);
       if (row) row.querySelector(".clean-state").innerHTML = `<span class="spinner"></span>`;
     });
-    T.event.listen("threat-found", (e) => onThreatFound(e.payload || {}));
     T.event.listen("auto-cleaned", (e) => {
       const { freedBytes, removedFiles } = e.payload || {};
       state.history.cleans.unshift({ at: Date.now(), freed: freedBytes });
@@ -909,6 +1364,22 @@ function wire() {
         body: "Memory usage was above 85% — working sets trimmed automatically.",
       });
     });
+    T.event.listen("game-detected", (e) => {
+      const p = e.payload || {};
+      pushActivity({ icon: "warn", title: `${p.name || "A game"} launched`, sub: timeAgo(Date.now()) });
+      if (state.page === "game") refreshGameData();
+      else {
+        updateGameBannerFromEvent(p.name);
+      }
+      toast(`${p.name || "Game"} detected`, {
+        kind: "good",
+        body: "Game Mode is active — your tweaks are applied.",
+      });
+    });
+    T.event.listen("game-closed", (e) => {
+      if (state.page === "game") refreshGameData();
+      else updateGameBannerFromEvent(null);
+    });
     T.event.listen("update-progress", (e) => onUpdateProgress(e.payload || {}));
     T.event.listen("update-installed", () => {
       $("#updateProgressLabel").textContent = "Installed — restarting Optimakerpro…";
@@ -921,6 +1392,22 @@ function wire() {
       note.textContent = (e.payload && e.payload.message) || "Update failed.";
       note.className = "update-note muted err";
     });
+  }
+}
+
+function updateGameBannerFromEvent(name) {
+  const pill = $("#gmPill");
+  const pillText = $("#gmPillText");
+  if (name) {
+    pill.classList.add("on");
+    pillText.textContent = "GAME MODE ON";
+    $("#gmStatusText").textContent = `${name} is running — your tweaks are active.`;
+    $("#boostGameBtn").classList.remove("hidden");
+  } else {
+    pill.classList.remove("on");
+    pillText.textContent = "NO GAME RUNNING";
+    $("#gmStatusText").textContent = "Detection is on — launch a game.";
+    $("#boostGameBtn").classList.add("hidden");
   }
 }
 

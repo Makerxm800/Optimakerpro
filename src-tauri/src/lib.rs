@@ -1,7 +1,7 @@
 mod boost;
 mod cleaner;
+mod game_mode;
 mod guard;
-mod quarantine;
 mod runtime;
 mod settings;
 mod startup;
@@ -46,6 +46,7 @@ pub fn save_settings(new_settings: settings::Settings) -> Result<settings::Setti
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_updater::Builder::new().build())
+        .plugin(tauri_plugin_dialog::init())
         .manage(SysState {
             system: Mutex::new(System::new_all()),
         })
@@ -61,11 +62,16 @@ pub fn run() {
             startup::list_startup,
             startup::set_launch_on_startup,
             startup::remove_startup_item,
-            quarantine::quarantine_file,
-            quarantine::list_quarantine,
-            quarantine::restore_quarantined,
-            quarantine::delete_quarantined,
-            quarantine::reveal_quarantine,
+            game_mode::get_core_topology,
+            game_mode::list_games,
+            game_mode::add_game_from_path,
+            game_mode::remove_game,
+            game_mode::set_game_tweak,
+            game_mode::boost_game,
+            game_mode::get_tweak_catalog,
+            game_mode::get_tweak_states,
+            game_mode::set_tweaks,
+            game_mode::set_game_mode,
             updates::check_for_updates,
             updates::install_update,
         ])

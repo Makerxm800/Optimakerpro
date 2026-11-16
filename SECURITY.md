@@ -28,28 +28,30 @@ You'll get an acknowledgement within 72 hours.
 **High priority**
 
 - Arbitrary file deletion outside the documented cleanup locations
-- Path traversal or symlink following in cleanup, quarantine or restore
-- Command/registry injection through startup item names or paths
+- Path traversal or symlink following in the cleanup engine
+- Affinity tweaks applied to the wrong process (name collisions)
 - Update signature bypass or downgrade attacks
+- Registry writes escaping the documented tweak keys
 - Any code execution triggered by scanning a crafted file
 
 **Medium priority**
 
 - DoS (hang or crash of the backend loop)
-- Quarantine bypass — restoring a file without user action
+- UAC prompt contents tampered with (the generated .reg file is written to a
+  world-readable temp path before elevation)
 - Settings file tampering enabling auto-execution
 
 **Not vulnerabilities**
 
-- Missed detections — the temp-folder watcher is a heuristic, not antivirus
 - Locked temp files skipped during cleanup — by design
-- Running without admin — the app never requests elevation; HKLM startup
-  removal fails without admin on purpose
+- Running without admin — the app never self-elevates; admin tweaks show a UAC
+  prompt that the user can decline, and the result is verified and reported
+- Game affinity reverting when a game restarts — expected; tweaks re-apply
 - No code signing of installers — noted, not exploitable
 
 ## Scope
 
-- `src-tauri/src/**` — all backend commands and filesystem operations
+- `src-tauri/src/**` — all backend commands and filesystem/registry operations
 - `ui/**` — frontend logic
 - `scripts/**` — release tooling
 
@@ -58,10 +60,13 @@ infrastructure.
 
 ## Design notes
 
-- The app runs **without** administrator privileges.
+- The app runs **without** administrator privileges. Admin-marked tweaks are
+  the only things that trigger UAC, through a generated `.reg` file imported
+  with an elevated `reg import` — the user sees and can decline the prompt,
+  and every change is read back and verified afterwards.
 - Cleanup deletes only files older than one hour inside fixed, well-known
   temp/cache locations, and never follows symlinks (`symlink_metadata` only).
-- Quarantine moves files into `%LOCALAPPDATA%\Optimakerpro\quarantine` with a
-  manifest; restoring requires an explicit click.
+- Game tweaks write only HKCU registry values and process affinity masks;
+  HKLM tweaks are explicitly marked "Admin" in the UI.
 - Updates are minisign-verified against the public key in `tauri.conf.json`
   before installation.

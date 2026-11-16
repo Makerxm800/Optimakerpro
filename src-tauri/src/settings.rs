@@ -4,7 +4,6 @@ use std::path::PathBuf;
 #[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(rename_all = "camelCase", default)]
 pub struct Settings {
-    pub real_time_protection: bool,
     pub auto_memory_boost: bool,
     pub auto_cleanup: bool,
     pub silent_mode: bool,
@@ -16,7 +15,6 @@ pub struct Settings {
 impl Default for Settings {
     fn default() -> Self {
         Settings {
-            real_time_protection: true,
             auto_memory_boost: true,
             auto_cleanup: true,
             silent_mode: false,

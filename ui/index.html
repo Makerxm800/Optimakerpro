@@ -33,9 +33,9 @@
           <svg viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
           <span>Performance</span>
         </button>
-        <button class="nav-item" data-page="protection">
-          <svg viewBox="0 0 24 24"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/></svg>
-          <span>Protection</span>
+        <button class="nav-item" data-page="game">
+          <svg viewBox="0 0 24 24"><line x1="6" x2="10" y1="11" y2="11"/><line x1="8" x2="8" y1="9" y2="13"/><line x1="15" x2="15.01" y1="12" y2="12"/><line x1="18" x2="18.01" y1="10" y2="10"/><path d="M17.32 5H6.68a4 4 0 0 0-3.978 3.59c-.006.052-.01.101-.017.152C2.604 9.416 2 14.456 2 16a3 3 0 0 0 3 3c1 0 1.5-.5 2-1l1.414-1.414A2 2 0 0 1 9.828 16h4.344a2 2 0 0 1 1.414.586L17 18c.5.5 1 1 2 1a3 3 0 0 0 3-3c0-1.545-.604-6.584-.685-7.258-.007-.05-.011-.1-.017-.151A4 4 0 0 0 17.32 5z"/></svg>
+          <span>Game Mode</span>
         </button>
         <button class="nav-item" data-page="settings">
           <svg viewBox="0 0 24 24"><line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/><line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/></svg>
@@ -54,7 +54,7 @@
       <header class="topbar" data-tauri-drag-region>
         <h1 class="page-title" id="pageTitle" data-tauri-drag-region>Dashboard</h1>
         <div class="topbar-actions">
-          <button class="chip" id="silentChip" title="Pauses scans, auto-actions and notifications">
+          <button class="chip" id="silentChip" title="Pauses auto-actions and notifications">
             <svg viewBox="0 0 24 24"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>
             <span>Silent mode</span>
           </button>
@@ -147,14 +147,6 @@
           <h3 class="section-title">Feature quick access</h3>
           <div class="features-grid">
             <div class="card feature-tile">
-              <div class="feature-icon"><svg viewBox="0 0 24 24"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/></svg></div>
-              <div class="feature-text">
-                <strong>Real-Time Protection</strong>
-                <span>Watches your temp folders for suspicious executable drops</span>
-              </div>
-              <button class="switch" role="switch" aria-checked="false" data-setting="realTimeProtection" aria-label="Toggle Real-Time Protection"><span class="knob"></span></button>
-            </div>
-            <div class="card feature-tile">
               <div class="feature-icon"><svg viewBox="0 0 24 24"><path d="M6 19v-3"/><path d="M10 19v-3"/><path d="M14 19v-3"/><path d="M18 19v-3"/><path d="M2 15h20"/><path d="M2 7a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1Z"/></svg></div>
               <div class="feature-text">
                 <strong>Auto Memory Boost</strong>
@@ -173,17 +165,25 @@
             <div class="card feature-tile">
               <div class="feature-icon"><svg viewBox="0 0 24 24"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg></div>
               <div class="feature-text">
-                <strong>Silent / Game Mode</strong>
-                <span>Pauses background scans and notifications while you play</span>
+                <strong>Silent Mode</strong>
+                <span>Pauses background activity and notifications while you work</span>
               </div>
-              <button class="switch" role="switch" aria-checked="false" data-setting="silentMode" aria-label="Toggle Silent or Game Mode"><span class="knob"></span></button>
+              <button class="switch" role="switch" aria-checked="false" data-setting="silentMode" aria-label="Toggle Silent Mode"><span class="knob"></span></button>
+            </div>
+            <div class="card feature-tile">
+              <div class="feature-icon"><svg viewBox="0 0 24 24"><line x1="6" x2="10" y1="11" y2="11"/><line x1="8" x2="8" y1="9" y2="13"/><line x1="15" x2="15.01" y1="12" y2="12"/><line x1="18" x2="18.01" y1="10" y2="10"/><path d="M17.32 5H6.68a4 4 0 0 0-3.978 3.59c-.006.052-.01.101-.017.152C2.604 9.416 2 14.456 2 16a3 3 0 0 0 3 3c1 0 1.5-.5 2-1l1.414-1.414A2 2 0 0 1 9.828 16h4.344a2 2 0 0 1 1.414.586L17 18c.5.5 1 1 2 1a3 3 0 0 0 3-3c0-1.545-.604-6.584-.685-7.258-.007-.05-.011-.1-.017-.151A4 4 0 0 0 17.32 5z"/></svg></div>
+              <div class="feature-text">
+                <strong>Game Mode</strong>
+                <span>Game detection, per-game tweaks and system tuning</span>
+              </div>
+              <button class="btn btn-sm" id="gameTileBtn">Open</button>
             </div>
           </div>
 
           <h3 class="section-title">Recent activity</h3>
           <div class="card activity-card">
             <ul class="activity-list" id="activityList">
-              <li class="activity-empty">Nothing yet — cleanups, boosts and alerts will show up here.</li>
+              <li class="activity-empty">Nothing yet — cleanups, boosts and game sessions will show up here.</li>
             </ul>
           </div>
         </section>
@@ -273,30 +273,56 @@
           </div>
         </section>
 
-        <!-- ============ PROTECTION ============ -->
-        <section class="page" id="page-protection">
-          <div class="card protection-hero">
-            <div class="feature-icon big">
-              <svg viewBox="0 0 24 24"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/></svg>
+        <!-- ============ GAME MODE ============ -->
+        <section class="page" id="page-game">
+          <div class="card game-hero">
+            <div class="game-hero-left">
+              <div class="feature-icon big">
+                <svg viewBox="0 0 24 24"><line x1="6" x2="10" y1="11" y2="11"/><line x1="8" x2="8" y1="9" y2="13"/><line x1="15" x2="15.01" y1="12" y2="12"/><line x1="18" x2="18.01" y1="10" y2="10"/><path d="M17.32 5H6.68a4 4 0 0 0-3.978 3.59c-.006.052-.01.101-.017.152C2.604 9.416 2 14.456 2 16a3 3 0 0 0 3 3c1 0 1.5-.5 2-1l1.414-1.414A2 2 0 0 1 9.828 16h4.344a2 2 0 0 1 1.414.586L17 18c.5.5 1 1 2 1a3 3 0 0 0 3-3c0-1.545-.604-6.584-.685-7.258-.007-.05-.011-.1-.017-.151A4 4 0 0 0 17.32 5z"/></svg>
+              </div>
+              <div class="game-hero-title">
+                <h2>Game Mode</h2>
+                <p class="muted">Pick a mode, activate optimizations and tune each game. Games are detected automatically while Optimakerpro is running.</p>
+                <div class="mode-pills" id="modePills">
+                  <button class="mode-pill" data-mode="balanced">Balanced</button>
+                  <button class="mode-pill" data-mode="performance">Performance</button>
+                  <button class="mode-pill" data-mode="custom">Custom</button>
+                </div>
+              </div>
             </div>
-            <div class="protection-text">
-              <h2>Real-Time Protection</h2>
-              <p class="muted">Watches your temp folders for executable files dropped by browsers and installers, so sketchy downloads don't sit unnoticed. Nothing is deleted automatically — you decide what to do with each alert.</p>
+            <div class="game-hero-right">
+              <span class="gm-pill off" id="gmPill">
+                <span class="gm-dot"></span>
+                <span id="gmPillText">NO GAME RUNNING</span>
+              </span>
+              <span class="muted" id="gmStatusText">Detection is on — launch a game.</span>
+              <div class="game-hero-actions">
+                <button class="btn btn-sm hidden" id="boostGameBtn">
+                  <svg viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+                  Boost now
+                </button>
+                <button class="btn btn-sm" id="editModeBtn">Edit Mode</button>
+              </div>
             </div>
-            <button class="switch" role="switch" aria-checked="false" data-setting="realTimeProtection" aria-label="Toggle Real-Time Protection"><span class="knob"></span></button>
           </div>
 
-          <div class="card">
-            <h3>Quarantine</h3>
-            <p class="muted card-hint">Files moved out of circulation live here. Restore only if you trust them.</p>
-            <ul class="quar-list" id="quarList">
-              <li class="list-empty">Quarantine is empty.</li>
-            </ul>
-            <button class="btn" id="openQuarBtn">
-              <svg viewBox="0 0 24 24"><path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/></svg>
-              Open quarantine folder
-            </button>
+          <div class="row-head">
+            <h3 class="section-title">My Games</h3>
+            <button class="btn btn-sm" id="addGameBtn">+ Add game</button>
           </div>
+          <div class="games-row" id="gamesRow"></div>
+
+          <div class="row-head tweaks-head-row">
+            <h3 class="section-title">Recommended optimizations</h3>
+            <div class="cat-tabs" id="catTabs">
+              <button class="cat-tab active" data-cat="all">All</button>
+              <button class="cat-tab" data-cat="fps">FPS &amp; Latency</button>
+              <button class="cat-tab" data-cat="network">Network &amp; Ping</button>
+              <button class="cat-tab" data-cat="qol">Quality of Life</button>
+              <button class="cat-tab" data-cat="privacy">Privacy &amp; Security</button>
+            </div>
+          </div>
+          <div class="tweaks-grid" id="tweaksGrid"></div>
         </section>
 
         <!-- ============ SETTINGS ============ -->
@@ -355,13 +381,6 @@
             <h3>Features</h3>
             <div class="setting-row">
               <div class="setting-text">
-                <strong>Real-Time Protection</strong>
-                <span>Alerts when executable files appear in your temp folders</span>
-              </div>
-              <button class="switch" role="switch" aria-checked="false" data-setting="realTimeProtection" aria-label="Toggle Real-Time Protection"><span class="knob"></span></button>
-            </div>
-            <div class="setting-row">
-              <div class="setting-text">
                 <strong>Auto Memory Boost</strong>
                 <span>Trims working sets when memory usage exceeds 85%</span>
               </div>
@@ -391,6 +410,11 @@
 
       </main>
     </div>
+  </div>
+
+  <!-- ============ MODAL ============ -->
+  <div class="modal-overlay hidden" id="modalOverlay">
+    <div class="modal" id="modalBox"></div>
   </div>
 
   <div class="toasts" id="toasts"></div>

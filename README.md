@@ -13,9 +13,23 @@ Small installer, tiny memory footprint, no background bloat.
   skipped automatically.
 - **Memory boost** — trims the working sets of memory-hungry processes to push
   reclaimable pages back to the system (measured, not magic).
-- **Real-Time Protection** — watches your temp folders for executable files
-  dropped by browsers/installers and lets you quarantine them with one click.
-  Nothing is deleted automatically.
+- **Game Mode** — detects installed games (Steam, Epic, Riot or any .exe you
+  add), applies per-game tweaks the moment a game launches, and offers real
+  Windows optimizations organized by category:
+  - *Game-specific:* Disable CPU 0, Disable E-Cores, Disable SMT/Hyperthreading
+    (applied live via `SetProcessAffinityMask`), Disable Fullscreen
+    Optimizations (per-game compatibility flag).
+  - *FPS & Latency:* Windows Game Mode, Game DVR off, High performance power
+    plan, mouse acceleration off, hardware-accelerated GPU scheduling.
+  - *Network & Ping:* network throttling off, system responsiveness, Games task
+    priority, Nagle's algorithm off.
+  - *Quality of Life:* window animations off, startup delay removed,
+    background apps disabled.
+  - *Privacy & Security:* advertising ID, typing personalisation, tailored
+    experiences, diagnostic data policy.
+  - Modes: **Balanced**, **Performance**, **Custom**. Tweak cards show
+    Safe/Advanced badges and restart requirements; admin tweaks ask once
+    through a single UAC prompt and are verified after applying.
 - **Auto Cleanup** — runs the safe sweep on your schedule (2/6/12/24 h).
 - **Auto Memory Boost** — kicks in by itself when memory usage passes 85%.
 - **Silent / Game Mode** — pauses all background activity and notifications.
