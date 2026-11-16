@@ -51,4 +51,22 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
 
       - name: Check Rust backend
-        run: cargo check --manifest-path src-tauri/Cargo.toml
+        run: |
+          set -o pipefail
+          cargo check --manifest-path src-tauri/Cargo.toml 2>&1 | tee /tmp/cargo-check.log
+
+      - name: Comment Rust errors on PR
+        if: failure() && github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const log = fs.readFileSync('/tmp/cargo-check.log', 'utf8');
+            const lines = log.split('\n').slice(-80).join('\n');
+            const body = '**Rust check failed** - last 80 lines of cargo check:\n\n```\n' + lines + '\n```';
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.payload.pull_request.number,
+              body,
+            });
