@@ -20,7 +20,7 @@ jobs:
           - platform: windows-latest
             args: --target i686-pc-windows-msvc --bundles nsis
             rust_targets: i686-pc-windows-msvc
-          - platform: ubuntu-22.04
+          - platform: ubuntu-24.04
             args: --bundles deb,appimage
             rust_targets: ""
           - platform: macos-latest
@@ -28,6 +28,9 @@ jobs:
             rust_targets: aarch64-apple-darwin
 
     runs-on: ${{ matrix.platform }}
+    env:
+      TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+      TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
     steps:
       - uses: actions/checkout@v4
 
@@ -46,10 +49,25 @@ jobs:
           workspaces: src-tauri
 
       - name: Install Linux dependencies
-        if: matrix.platform == 'ubuntu-22.04'
+        if: matrix.platform == 'ubuntu-24.04'
         run: |
           sudo apt-get update
           sudo apt-get install -y libwebkit2gtk-4.1-dev libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev patchelf
+
+      # Without the signing key the bundler refuses to create updater
+      # artifacts — so when the key secret isn't set yet, build plain
+      # installers instead of failing the whole release.
+      - name: Skip updater artifacts when signing key is missing
+        if: env.TAURI_SIGNING_PRIVATE_KEY == ''
+        run: |
+          node -e "
+            const fs = require('fs');
+            const f = 'src-tauri/tauri.conf.json';
+            const j = JSON.parse(fs.readFileSync(f, 'utf8'));
+            delete j.bundle.createUpdaterArtifacts;
+            fs.writeFileSync(f, JSON.stringify(j, null, 2) + '\n');
+            console.log('NOTE: TAURI_SIGNING_PRIVATE_KEY secret not set — building installers without signed updater artifacts.');
+          "
 
       - name: Install frontend dependencies
         run: npm ci
@@ -58,8 +76,6 @@ jobs:
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
-          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
           tagName: optimakerpro-v__VERSION__
           releaseName: Optimakerpro v__VERSION__
