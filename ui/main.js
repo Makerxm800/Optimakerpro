@@ -6,9 +6,11 @@
 
 "use strict";
 
-const T = window.__TAURI__;
-const isTauri = !!T;
-const invoke = isTauri ? T.core.invoke : demoInvoke;
+const T = (typeof window !== "undefined" && window.__TAURI__) || null;
+// Only treat Tauri as available when the IPC surface is actually present —
+// a half-injected global must never kill the whole script.
+const isTauri = !!(T && T.core && typeof T.core.invoke === "function");
+const invoke = isTauri ? T.core.invoke.bind(T.core) : demoInvoke;
 
 const $ = (sel) => document.querySelector(sel);
 const $$ = (sel) => Array.from(document.querySelectorAll(sel));
@@ -29,6 +31,9 @@ const state = {
   mode: "balanced",
   gameCat: "all",
   runningGame: null,
+  // Settings overlay
+  settingsOpen: false,
+  settingsSection: "general",
 };
 
 /* ============================================================
@@ -348,6 +353,8 @@ async function demoInvoke(cmd, args = {}) {
       return args.newSettings;
     case "get_app_info":
       return { name: "Optimakerpro", version: "1.0.0", os: "windows", arch: "x86_64" };
+    case "get_app_info":
+      return { name: "Optimakerpro", version: "1.0.1", os: "windows", arch: "x86_64" };
     case "get_system_info":
       return {
         os_name: "Windows",
@@ -486,6 +493,53 @@ function setPage(page) {
 }
 
 /* ============================================================
+   Settings overlay (centered modal with sidebar navigation)
+   ============================================================ */
+
+function openSettings() {
+  const overlay = $("#settingsOverlay");
+  if (!overlay) return;
+  state.settingsOpen = true;
+  overlay.classList.remove("hidden");
+  $$(".nav-item").forEach((b) => b.classList.toggle("active", b.dataset.page === "settings"));
+  const search = $("#settingsSearch");
+  if (search) setTimeout(() => search.focus(), 80);
+}
+
+function closeSettings() {
+  const overlay = $("#settingsOverlay");
+  if (!overlay) return;
+  state.settingsOpen = false;
+  overlay.classList.add("hidden");
+  $$(".nav-item").forEach((b) => b.classList.toggle("active", b.dataset.page === state.page));
+  const search = $("#settingsSearch");
+  if (search) search.value = "";
+  applySettingsSearch("");
+}
+
+/* Search filters rows across every section; clearing returns to the
+   currently selected section. */
+function applySettingsSearch(query) {
+  const q = (query || "").trim().toLowerCase();
+  const active = state.settingsSection || "general";
+  $$("#settingsContent .settings-pane").forEach((pane) => {
+    const rows = Array.from(pane.querySelectorAll(".setting-row, .muted, .mini-progress, .settings-actions, .update-note, .about-body"));
+    if (!q) {
+      pane.classList.toggle("hidden", pane.dataset.pane !== active);
+      rows.forEach((r) => r.classList.remove("hidden"));
+      return;
+    }
+    let visible = 0;
+    rows.forEach((row) => {
+      const match = row.textContent.toLowerCase().includes(q);
+      row.classList.toggle("hidden", !match);
+      if (match) visible++;
+    });
+    pane.classList.toggle("hidden", visible === 0);
+  });
+}
+
+/* ============================================================
    Settings
    ============================================================ */
 
@@ -610,7 +664,14 @@ async function pollStats() {
       $("#uptimeVal").textContent = `${Math.floor(state.snapshot.uptime_secs / 3600)}h`;
     }
   } catch {
-    /* keep polling silently */
+    // Backend unreachable → fall back to preview data so the dashboard never
+    // sits on "Checking your system…".
+    try {
+      state.snapshot = await demoInvoke("get_system_info", {});
+      renderStats();
+    } catch {
+      /* keep polling silently */
+    }
   }
 }
 
@@ -1296,6 +1357,7 @@ async function boostGameNow() {
 
 function setUpdateStatus(text, cls = "") {
   const el = $("#updateStatus");
+  if (!el) return;
   el.textContent = text;
   el.className = `muted ${cls}`;
 }
@@ -1403,9 +1465,36 @@ function onUpdateProgress(payload) {
    ============================================================ */
 
 function wire() {
-  // Navigation
+  // Navigation (Settings opens the centered overlay instead of a page)
   $$(".nav-item").forEach((btn) => {
-    btn.addEventListener("click", () => setPage(btn.dataset.page));
+    btn.addEventListener("click", () => {
+      if (btn.dataset.page === "settings") openSettings();
+      else setPage(btn.dataset.page);
+    });
+  });
+
+  // Settings overlay
+  const overlay = $("#settingsOverlay");
+  if (overlay) {
+    overlay.addEventListener("click", (e) => {
+      if (e.target === overlay) closeSettings();
+    });
+  }
+  const closeBtn = $("#settingsCloseBtn");
+  if (closeBtn) closeBtn.addEventListener("click", closeSettings);
+  $$("#settingsNav .settings-nav-item").forEach((item) => {
+    item.addEventListener("click", () => {
+      $$("#settingsNav .settings-nav-item").forEach((i) => i.classList.toggle("active", i === item));
+      state.settingsSection = item.dataset.section;
+      applySettingsSearch(($("#settingsSearch") || {}).value || "");
+    });
+  });
+  const search = $("#settingsSearch");
+  if (search) {
+    search.addEventListener("input", (e) => applySettingsSearch(e.target.value));
+  }
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && state.settingsOpen) closeSettings();
   });
 
   // Settings toggles
@@ -1456,7 +1545,6 @@ function wire() {
   // Settings
   $("#checkUpdatesBtn").addEventListener("click", () => checkForUpdates(true));
   $("#installUpdateBtn").addEventListener("click", installUpdate);
-  $("#settingsCloseBtn").addEventListener("click", () => setPage("dashboard"));
 
   if (isTauri) {
     T.event.listen("clean-progress", (e) => {
@@ -1537,8 +1625,35 @@ function updateGameBannerFromEvent(name) {
    Init
    ============================================================ */
 
+const FALLBACK_VERSION = "1.0.1";
+
+function applyVersionLabel(version) {
+  const pill = $("#versionPill");
+  if (pill) pill.textContent = `v${version}`;
+  const about = $("#aboutInfo");
+  if (about) about.textContent = `Version ${version} · Windows (x86_64 & x86)`;
+  const foot = $("#settingsFootVersion");
+  if (foot) foot.textContent = `v${version}`;
+  setUpdateStatus(`Current version: v${version}`);
+}
+
 async function init() {
-  if (!isTauri) $("#demoBadge").classList.remove("hidden");
+  // Version label goes up FIRST and synchronously — the footer can never sit
+  // on "v—" while IPC answers are pending.
+  applyVersionLabel(FALLBACK_VERSION);
+
+  if (!isTauri) {
+    const badge = $("#demoBadge");
+    if (badge) badge.classList.remove("hidden");
+  }
+
+  // Surface unexpected errors as a toast instead of a silently dead UI.
+  window.addEventListener("error", (e) => {
+    toast("Something glitched", { kind: "err", body: String(e.message || e).slice(0, 140) });
+  });
+  window.addEventListener("unhandledrejection", (e) => {
+    toast("Something glitched", { kind: "err", body: String(e.reason || e).slice(0, 140) });
+  });
 
   try {
     wire();
@@ -1546,30 +1661,22 @@ async function init() {
     console.error("wire failed", e);
   }
 
-  try {
-    await loadSettings();
-  } catch (e) {
-    console.error("settings failed", e);
-  }
-
-  let version = "1.0.0";
-  try {
-    const info = await invoke("get_app_info");
-    version = info.version || version;
-  } catch {
-    /* keep fallback version */
-  }
-  $("#versionPill").textContent = `v${version}`;
-  const about = $("#aboutInfo");
-  if (about) {
-    about.textContent = `Version ${version} · Windows (x86_64 & x86)`;
-  }
-  setUpdateStatus(`Current version: v${version}`);
-
+  // Stats start polling immediately — no await in front of them, so the
+  // dashboard populates even if settings IPC is slow or unavailable.
   renderActivity();
   renderHistory();
   pollStats();
   setInterval(pollStats, 2500);
+
+  // Settings load in the background; when they arrive the toggles sync.
+  loadSettings().catch((e) => console.error("settings failed", e));
+
+  try {
+    const info = await invoke("get_app_info");
+    if (info && info.version) applyVersionLabel(info.version);
+  } catch {
+    /* keep the fallback version */
+  }
 
   // Quiet update check shortly after launch.
   setTimeout(() => {
