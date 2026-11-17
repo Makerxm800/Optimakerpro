@@ -1,73 +1,46 @@
-# Contributing to SentinelScan
+# Contributing to Optimakerpro
 
-First off — thank you for considering a contribution. SentinelScan is a small, focused project and every issue, PR, or suggestion helps make it better.
+Thank you for considering a contribution! This project is intentionally small
+and focused: a fast, lightweight PC optimizer.
 
-This document explains how to contribute cleanly so your work gets merged quickly.
+## Before you start
 
----
+1. Search existing issues and PRs first.
+2. Open an issue for anything larger than a typo fix.
+3. Keep the app lean — no heavy frameworks, no new runtime dependencies unless
+   there's a strong reason.
 
-## 📖 Table of Contents
+## Development setup
 
-- [Code of Conduct](#-code-of-conduct)
-- [Ways to Contribute](#-ways-to-contribute)
-- [Before You Start](#-before-you-start)
-- [Development Setup](#-development-setup)
-- [Project Guidelines](#-project-guidelines)
-- [Commit Messages](#-commit-messages)
-- [Pull Request Process](#-pull-request-process)
-- [Adding Detection Rules](#-adding-detection-rules)
-- [Adding UI Features](#-adding-ui-features)
-- [Reporting Bugs](#-reporting-bugs)
-- [Requesting Features](#-requesting-features)
-- [Recognition](#-recognition)
+- Node.js 18+, Rust stable (1.77.2+)
+- Windows: MSVC Build Tools; Linux: `libwebkit2gtk-4.1-dev libgtk-3-dev`
+- `npm install`, then `npm run dev`
 
----
+Please run `cargo check --all-targets` before opening a PR — CI runs it for
+x86_64 **and** i686 Windows targets, plus Linux and macOS.
 
-## 🤝 Code of Conduct
+## Project guidelines
 
-Be kind, be patient, assume good faith. We're all here to build something useful.
+- **Frontend** is framework-free HTML/CSS/JS in `ui/`. Keep it that way.
+- **Backend** commands live in focused modules (`cleaner.rs`, `boost.rs`,
+  `guard.rs`, ...). Every new command must be registered in `lib.rs`.
+- Cleanup code must be conservative: skip files younger than an hour, never
+  follow symlinks, never touch user documents.
+- Nothing may phone home. The only network traffic is the update check.
+- Keep naming clean: the app is called **Optimakerpro** — no marketing suffixes
+  in the UI.
 
-Harassment, discrimination, or hostility of any kind will not be tolerated. Report concerns to the maintainers via the email on the GitHub profile.
+## Commit messages
 
----
+Short imperative subject line, e.g. `fix: keep toggle knob centered on small tiles`.
 
-## 🎯 Ways to Contribute
+## Pull requests
 
-You don't have to write code to help. Useful contributions include:
+- One logical change per PR.
+- Describe what changed and why, and include screenshots for UI changes.
+- New features should come with a short note in the README.
 
-- 🐛 **Reporting bugs** with clear reproduction steps
-- 💡 **Requesting features** with use cases
-- 📖 **Improving documentation** — typos, clarity, missing examples
-- 🎨 **Design feedback** on the UI (screenshots welcome)
-- 🧪 **Testing on different platforms** — Windows 10/11, macOS Intel/ARM, various Linux distros
-- 🌍 **Translations** of the UI (when i18n lands)
-- 🔬 **Sharing detection rules** you've found useful
-- ⭐ **Starring the repo** — helps visibility
+## Reporting bugs
 
----
-
-## ✅ Before You Start
-
-Before opening a PR, please:
-
-1. **Search existing issues and PRs** — your idea may already be in progress.
-2. **Open an issue first** for anything larger than a typo fix.
-3. **Read the guidelines below** — they're short and they matter.
-4. **Test your change** on at least one platform.
-
-For tiny fixes (typos, obvious bugs), skip straight to a PR.
-
----
-
-## 🛠️ Development Setup
-
-### Requirements
-
-- Python 3.8 or newer
-- Tkinter (bundled with Python on Windows/macOS)
-- No third-party packages — this is a hard rule
-
-### Linux only
-
-```bash
-sudo apt install python3-tk
+Open an issue with: app version, Windows version (and 32/64-bit), steps to
+reproduce, what happened vs. what you expected. Screenshots welcome.

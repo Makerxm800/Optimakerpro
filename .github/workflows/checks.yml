@@ -1,0 +1,73 @@
+name: Checks
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  cargo-check:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            extra_target: i686-pc-windows-msvc
+          - os: ubuntu-24.04
+            extra_target: ""
+          - os: macos-latest
+            extra_target: ""
+
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.extra_target }}
+
+      - name: Rust cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - name: Install Linux dependencies
+        if: matrix.os == 'ubuntu-24.04'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev patchelf
+
+      - name: cargo check (capture output)
+        working-directory: src-tauri
+        shell: bash
+        run: |
+          set -o pipefail
+          cargo check --all-targets 2>&1 | tee check-output.log
+
+      - name: cargo check (32-bit Windows target)
+        if: matrix.extra_target != '' && success()
+        working-directory: src-tauri
+        shell: bash
+        run: |
+          set -o pipefail
+          cargo check --all-targets --target ${{ matrix.extra_target }} 2>&1 | tee check-output-32.log
+
+      # Debugging aid: publish the compiler output to a branch so errors can
+      # be read from environments that can't download Actions logs.
+      - name: Push compile log to ci-logs branch
+        if: failure()
+        shell: bash
+        run: |
+          git config user.name "ci-log-bot"
+          git config user.email "ci-log-bot@users.noreply.github.com"
+          git checkout -B ci-logs
+          cp src-tauri/check-output.log "cargo-check-${{ matrix.os }}.log" 2>/dev/null || true
+          cp src-tauri/check-output-32.log "cargo-check-32-${{ matrix.os }}.log" 2>/dev/null || true
+          git add -f cargo-check-*.log 2>/dev/null || true
+          git commit -m "cargo check log (${{ matrix.os }}) for ${{ github.sha }}" || true
+          git push --force origin ci-logs
