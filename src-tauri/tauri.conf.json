@@ -1,7 +1,7 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "Optimakerpro",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "identifier": "com.optimakerpro.desktop",
   "build": {
     "frontendDist": "../ui"
@@ -42,10 +42,13 @@
       },
       "nsis": {
         "installMode": "currentUser",
-        "languages": ["English"],
+        "languages": [
+          "English"
+        ],
         "displayLanguageSelector": false
       }
-    }
+    },
+    "pubkey": "ZFc1MGNuVnpkR1ZrSUdOdmJXMWxiblE2SUcxcGJtbHphV2R1SUhCMVlteHBZeUJyWlhrNklFUTFOamsxT1RsRE5UTXdRemN5T1VNS1VsZFRZMk5uZUZSdVJteHdNVmhqUlhKQ1lXSnBUMVZrVjJGcWVHVk9NWEZGUkdGblRrSmxUVTluY0haV1dVMXJTMnRhVVZKM09EWUs="
   },
   "plugins": {
     "updater": {

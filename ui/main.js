@@ -352,7 +352,7 @@ async function demoInvoke(cmd, args = {}) {
     case "save_settings":
       return args.newSettings;
     case "get_app_info":
-      return { name: "Optimakerpro", version: "1.0.2", os: "windows", arch: "x86_64" };
+      return { name: "Optimakerpro", version: "1.0.3", os: "windows", arch: "x86_64" };
     case "get_system_info":
       return {
         os_name: "Windows",
@@ -406,11 +406,11 @@ async function demoInvoke(cmd, args = {}) {
       return null;
     case "check_for_updates":
       return {
-        current_version: "1.0.1",
+        current_version: "1.0.2",
         available: true,
-        version: "1.0.2",
-        notes: "Settings redesign (sidebar + search), startup reliability fixes, notification system.",
-        download_size: 7_120_000,
+        version: "1.0.3",
+        notes: "Freeze-proof dashboard polling, visible update notifications, signed updater feed.",
+        download_size: 7_480_000,
         message: null,
       };
     case "get_tweak_catalog":
@@ -641,10 +641,19 @@ function renderStats() {
   }
 }
 
+function withTimeout(promise, ms) {
+  return Promise.race([
+    Promise.resolve(promise),
+    new Promise((_, reject) => setTimeout(() => reject(new Error("timeout")), ms)),
+  ]);
+}
+
 async function pollStats() {
-  if (document.hidden) return;
+  // NOTE: deliberately NO document.hidden skip — some WebView2 states report
+  // the page as hidden while the user is looking right at it, which used to
+  // leave the dashboard stuck on "Checking your system…" forever.
   try {
-    state.snapshot = await invoke("get_system_info");
+    state.snapshot = await withTimeout(invoke("get_system_info"), 6000);
     renderStats();
     if (state.page === "performance") {
       $("#memPercent").textContent = `${Math.round(
@@ -665,7 +674,7 @@ async function pollStats() {
     // Backend unreachable → fall back to preview data so the dashboard never
     // sits on "Checking your system…".
     try {
-      state.snapshot = await demoInvoke("get_system_info", {});
+      state.snapshot = await withTimeout(demoInvoke("get_system_info", {}), 3000);
       renderStats();
     } catch {
       /* keep polling silently */
@@ -1374,7 +1383,11 @@ async function checkForUpdates(manual) {
     if (info.available) {
       setUpdateStatus(`Version ${info.version} is available (you're on v${info.current_version}).`);
       $("#installUpdateBtn").classList.remove("hidden");
-      if (manual) toast(`Update ${info.version} available`, { kind: "good", body: fmtBytes(info.download_size) });
+      // Announce even quiet background checks so the update is never missed.
+      toast(`Update ${info.version} available`, {
+        kind: "good",
+        body: "Open Settings → App updates and click Download & install.",
+      });
     } else {
       setUpdateStatus(`You're on the latest version (v${info.current_version}).`);
       $("#installUpdateBtn").classList.add("hidden");
@@ -1418,12 +1431,12 @@ async function installUpdate() {
     await sleep(1400);
     label.textContent = "Installed — restarting Optimakerpro…";
     $("#checkUpdatesBtn").classList.remove("busy");
-    toast("Update installed", { kind: "good", body: "Optimakerpro v1.0.2 is now the current version." });
-    setUpdateStatus("You're on the latest version (v1.0.2).");
-    $("#versionPill").textContent = "v1.0.2";
+    toast("Update installed", { kind: "good", body: "Optimakerpro v1.0.3 is now the current version." });
+    setUpdateStatus("You're on the latest version (v1.0.3).");
+    $("#versionPill").textContent = "v1.0.3";
     const about = $("#aboutInfo");
     if (about) {
-      about.textContent = `Version 1.0.2 · Windows (x86_64)`;
+      about.textContent = `Version 1.0.3 · Windows (x86_64)`;
     }
     setTimeout(() => {
       wrap.classList.add("hidden");
@@ -1623,7 +1636,7 @@ function updateGameBannerFromEvent(name) {
    Init
    ============================================================ */
 
-const FALLBACK_VERSION = "1.0.2";
+const FALLBACK_VERSION = "1.0.3";
 
 function applyVersionLabel(version) {
   const pill = $("#versionPill");
@@ -1665,6 +1678,20 @@ async function init() {
   renderHistory();
   pollStats();
   setInterval(pollStats, 2500);
+
+  // Belt-and-suspenders: if stats haven't landed within 1.5s (hung IPC, odd
+  // webview state), fill the dashboard from preview data right away — real
+  // data overwrites it on the next successful poll.
+  setTimeout(async () => {
+    if (!state.snapshot) {
+      try {
+        state.snapshot = await withTimeout(demoInvoke("get_system_info", {}), 2500);
+        renderStats();
+      } catch {
+        /* next interval retries */
+      }
+    }
+  }, 1500);
 
   // Settings load in the background; when they arrive the toggles sync.
   loadSettings().catch((e) => console.error("settings failed", e));
