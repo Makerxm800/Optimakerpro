@@ -352,9 +352,7 @@ async function demoInvoke(cmd, args = {}) {
     case "save_settings":
       return args.newSettings;
     case "get_app_info":
-      return { name: "Optimakerpro", version: "1.0.0", os: "windows", arch: "x86_64" };
-    case "get_app_info":
-      return { name: "Optimakerpro", version: "1.0.1", os: "windows", arch: "x86_64" };
+      return { name: "Optimakerpro", version: "1.0.2", os: "windows", arch: "x86_64" };
     case "get_system_info":
       return {
         os_name: "Windows",
@@ -408,11 +406,11 @@ async function demoInvoke(cmd, args = {}) {
       return null;
     case "check_for_updates":
       return {
-        current_version: "1.0.0",
+        current_version: "1.0.1",
         available: true,
-        version: "1.0.1",
-        notes: "Game Mode fixes, centered settings menu, native window frame.",
-        download_size: 6_740_000,
+        version: "1.0.2",
+        notes: "Settings redesign (sidebar + search), startup reliability fixes, notification system.",
+        download_size: 7_120_000,
         message: null,
       };
     case "get_tweak_catalog":
@@ -1420,12 +1418,12 @@ async function installUpdate() {
     await sleep(1400);
     label.textContent = "Installed — restarting Optimakerpro…";
     $("#checkUpdatesBtn").classList.remove("busy");
-    toast("Update installed", { kind: "good", body: "Optimakerpro v1.0.1 is now the current version." });
-    setUpdateStatus("You're on the latest version (v1.0.1).");
-    $("#versionPill").textContent = "v1.0.1";
+    toast("Update installed", { kind: "good", body: "Optimakerpro v1.0.2 is now the current version." });
+    setUpdateStatus("You're on the latest version (v1.0.2).");
+    $("#versionPill").textContent = "v1.0.2";
     const about = $("#aboutInfo");
     if (about) {
-      about.textContent = `Version 1.0.1 · Windows (x86_64)`;
+      about.textContent = `Version 1.0.2 · Windows (x86_64)`;
     }
     setTimeout(() => {
       wrap.classList.add("hidden");
@@ -1625,7 +1623,7 @@ function updateGameBannerFromEvent(name) {
    Init
    ============================================================ */
 
-const FALLBACK_VERSION = "1.0.1";
+const FALLBACK_VERSION = "1.0.2";
 
 function applyVersionLabel(version) {
   const pill = $("#versionPill");

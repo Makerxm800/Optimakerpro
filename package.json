@@ -1,7 +1,7 @@
 {
   "name": "optimakerpro",
   "private": true,
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "Optimakerpro — a fast, lightweight PC optimizer for Windows (32-bit & 64-bit)",
   "scripts": {
     "tauri": "tauri",
