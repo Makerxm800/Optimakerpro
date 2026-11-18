@@ -1712,3 +1712,11 @@ body.no-anim *, body.no-anim *::before, body.no-anim *::after {
   .game-hero { flex-direction: column; }
   .game-hero-right { align-items: flex-start; min-width: 0; }
 }
+
+/* Build-version chip inside the dashboard hero card */
+.boot-version {
+  display: block;
+  font-size: 11px;
+  letter-spacing: 0.2px;
+  margin-top: 4px;
+}

@@ -352,7 +352,7 @@ async function demoInvoke(cmd, args = {}) {
     case "save_settings":
       return args.newSettings;
     case "get_app_info":
-      return { name: "Optimakerpro", version: "1.0.3", os: "windows", arch: "x86_64" };
+      return { name: "Optimakerpro", version: "1.0.4", os: "windows", arch: "x86_64" };
     case "get_system_info":
       return {
         os_name: "Windows",
@@ -406,11 +406,11 @@ async function demoInvoke(cmd, args = {}) {
       return null;
     case "check_for_updates":
       return {
-        current_version: "1.0.2",
+        current_version: "1.0.3",
         available: true,
-        version: "1.0.3",
-        notes: "Freeze-proof dashboard polling, visible update notifications, signed updater feed.",
-        download_size: 7_480_000,
+        version: "1.0.4",
+        notes: "Dashboard renders instantly at first paint, build version visible in-app.",
+        download_size: 7_610_000,
         message: null,
       };
     case "get_tweak_catalog":
@@ -1431,12 +1431,12 @@ async function installUpdate() {
     await sleep(1400);
     label.textContent = "Installed — restarting Optimakerpro…";
     $("#checkUpdatesBtn").classList.remove("busy");
-    toast("Update installed", { kind: "good", body: "Optimakerpro v1.0.3 is now the current version." });
-    setUpdateStatus("You're on the latest version (v1.0.3).");
-    $("#versionPill").textContent = "v1.0.3";
+    toast("Update installed", { kind: "good", body: "Optimakerpro v1.0.4 is now the current version." });
+    setUpdateStatus("You're on the latest version (v1.0.4).");
+    $("#versionPill").textContent = "v1.0.4";
     const about = $("#aboutInfo");
     if (about) {
-      about.textContent = `Version 1.0.3 · Windows (x86_64)`;
+      about.textContent = `Version 1.0.4 · Windows (x86_64)`;
     }
     setTimeout(() => {
       wrap.classList.add("hidden");
@@ -1636,7 +1636,32 @@ function updateGameBannerFromEvent(name) {
    Init
    ============================================================ */
 
-const FALLBACK_VERSION = "1.0.3";
+const FALLBACK_VERSION = "1.0.4";
+
+// Painted into the dashboard SYNCHRONOUSLY on first paint so the UI is never
+// an empty shell, even for the few hundred ms before the backend answers.
+// Real stats overwrite this on the first successful poll.
+const PLACEHOLDER_SNAPSHOT = {
+  os_name: "Windows",
+  os_version: "",
+  arch: "x86_64",
+  cpu_name: "Connecting to live stats…",
+  cpu_cores: 0,
+  cpu_usage: 0,
+  mem_total_bytes: 16 * 1024 ** 3,
+  mem_used_bytes: 6.2 * 1024 ** 3,
+  process_count: 0,
+  uptime_secs: 0,
+  disks: [{ mount: "C:\\", total_bytes: 1000 * 1024 ** 3, free_bytes: 640 * 1024 ** 3 }],
+};
+
+function paintPlaceholderStats() {
+  if (state.snapshot) return;
+  state.snapshot = PLACEHOLDER_SNAPSHOT;
+  renderStats();
+  const sub = $("#scoreSub");
+  if (sub) sub.textContent = "Sample values — your live stats take over in seconds.";
+}
 
 function applyVersionLabel(version) {
   const pill = $("#versionPill");
@@ -1645,13 +1670,16 @@ function applyVersionLabel(version) {
   if (about) about.textContent = `Version ${version} · Windows (x86_64 & x86)`;
   const foot = $("#settingsFootVersion");
   if (foot) foot.textContent = `v${version}`;
+  const boot = $("#bootVersion");
+  if (boot) boot.textContent = `Optimakerpro v${version}`;
   setUpdateStatus(`Current version: v${version}`);
 }
 
 async function init() {
-  // Version label goes up FIRST and synchronously — the footer can never sit
-  // on "v—" while IPC answers are pending.
+  // First paint, fully synchronous: version label + populated dashboard go up
+  // BEFORE any await — an empty "Checking your system…" card is impossible.
   applyVersionLabel(FALLBACK_VERSION);
+  paintPlaceholderStats();
 
   if (!isTauri) {
     const badge = $("#demoBadge");
