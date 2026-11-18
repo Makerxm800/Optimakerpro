@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Optimakerpro</title>
-  <link rel="stylesheet" href="style.css?v=11" />
+  <link rel="stylesheet" href="style.css?v=12" />
   <link rel="icon" href="logo.png" />
 </head>
 <body>
@@ -331,7 +331,6 @@
                 <nav class="settings-nav" id="settingsNav">
                   <button class="settings-nav-item active" data-section="general"><span class="section-ico">⚙</span>General</button>
                   <button class="settings-nav-item" data-section="features"><span class="section-ico">✦</span>Features</button>
-                  <button class="settings-nav-item" data-section="updates"><span class="section-ico">⬇</span>App updates</button>
                   <button class="settings-nav-item" data-section="about"><span class="section-ico">i</span>About</button>
                 </nav>
                 <div class="settings-sidebar-foot">
@@ -395,8 +394,18 @@
                   </div>
                 </section>
 
-                <section class="settings-pane hidden" data-pane="updates">
-                  <h2>App updates</h2>
+                <section class="settings-pane hidden" data-pane="about">
+                  <h2>About</h2>
+                  <div class="about-body">
+                    <img src="logo.png" alt="Optimakerpro logo" draggable="false" />
+                    <div class="about-text">
+                      <strong id="aboutName">Optimakerpro</strong>
+                      <span id="aboutInfo">Checking version…</span>
+                      <span class="muted about-tag">A fast, lightweight PC optimizer. No accounts, no telemetry.</span>
+                    </div>
+                  </div>
+
+                  <h3 class="about-sub">Updates</h3>
                   <p class="muted" id="updateStatus">Current version: v—</p>
                   <div class="mini-progress hidden" id="updateProgressWrap">
                     <div class="bar"><i id="updateBar"></i></div>
@@ -414,18 +423,6 @@
                   </div>
                   <p class="update-note muted" id="updateNote"></p>
                 </section>
-
-                <section class="settings-pane hidden" data-pane="about">
-                  <h2>About</h2>
-                  <div class="about-body">
-                    <img src="logo.png" alt="Optimakerpro logo" draggable="false" />
-                    <div class="about-text">
-                      <strong id="aboutName">Optimakerpro</strong>
-                      <span id="aboutInfo">Checking version…</span>
-                      <span class="muted about-tag">A fast, lightweight PC optimizer. No accounts, no telemetry.</span>
-                    </div>
-                  </div>
-                </section>
               </div>
             </div>
           </div>
@@ -441,6 +438,6 @@
   </div>
 
   <div class="toasts" id="toasts"></div>
-  <script src="main.js?v=11"></script>
+  <script src="main.js?v=12"></script>
 </body>
 </html>

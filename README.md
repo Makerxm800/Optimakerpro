@@ -70,7 +70,7 @@ The backend lives in [`src-tauri/src/`](src-tauri/src).
 ## Releases & auto-updates
 
 Releases are built by GitHub Actions (`.github/workflows/release.yml`) on tag
-pushes (`v1.0.4`, ...) or manual dispatch. One release contains:
+pushes (`v1.0.5`, ...) or manual dispatch. One release contains:
 
 - `Optimakerpro_<version>_x64-setup.exe` (64-bit)
 - `Optimakerpro_<version>_x86-setup.exe` (32-bit)

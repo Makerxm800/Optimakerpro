@@ -352,7 +352,7 @@ async function demoInvoke(cmd, args = {}) {
     case "save_settings":
       return args.newSettings;
     case "get_app_info":
-      return { name: "Optimakerpro", version: "1.0.4", os: "windows", arch: "x86_64" };
+      return { name: "Optimakerpro", version: "1.0.5", os: "windows", arch: "x86_64" };
     case "get_system_info":
       return {
         os_name: "Windows",
@@ -406,11 +406,11 @@ async function demoInvoke(cmd, args = {}) {
       return null;
     case "check_for_updates":
       return {
-        current_version: "1.0.3",
+        current_version: "1.0.4",
         available: true,
-        version: "1.0.4",
-        notes: "Dashboard renders instantly at first paint, build version visible in-app.",
-        download_size: 7_610_000,
+        version: "1.0.5",
+        notes: "Updates moved into About - Settings is simpler: General, Features, About.",
+        download_size: 7_580_000,
         message: null,
       };
     case "get_tweak_catalog":
@@ -1431,12 +1431,12 @@ async function installUpdate() {
     await sleep(1400);
     label.textContent = "Installed — restarting Optimakerpro…";
     $("#checkUpdatesBtn").classList.remove("busy");
-    toast("Update installed", { kind: "good", body: "Optimakerpro v1.0.4 is now the current version." });
-    setUpdateStatus("You're on the latest version (v1.0.4).");
-    $("#versionPill").textContent = "v1.0.4";
+    toast("Update installed", { kind: "good", body: "Optimakerpro v1.0.5 is now the current version." });
+    setUpdateStatus("You're on the latest version (v1.0.5).");
+    $("#versionPill").textContent = "v1.0.5";
     const about = $("#aboutInfo");
     if (about) {
-      about.textContent = `Version 1.0.4 · Windows (x86_64)`;
+      about.textContent = `Version 1.0.5 · Windows (x86_64)`;
     }
     setTimeout(() => {
       wrap.classList.add("hidden");
@@ -1636,7 +1636,7 @@ function updateGameBannerFromEvent(name) {
    Init
    ============================================================ */
 
-const FALLBACK_VERSION = "1.0.4";
+const FALLBACK_VERSION = "1.0.5";
 
 // Painted into the dashboard SYNCHRONOUSLY on first paint so the UI is never
 // an empty shell, even for the few hundred ms before the backend answers.

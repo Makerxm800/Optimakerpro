@@ -1720,3 +1720,13 @@ body.no-anim *, body.no-anim *::before, body.no-anim *::after {
   letter-spacing: 0.2px;
   margin-top: 4px;
 }
+
+/* Sub-heading inside a settings pane (e.g. About → Updates) */
+.settings-pane .about-sub {
+  margin: 18px 0 6px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+}
